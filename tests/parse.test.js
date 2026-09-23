@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cnToInt, parseLine, parseRoster, groupLabel, groupStudents } = require('../src/parse.js');
+const { cnToInt, parseLine, parseRoster, parseTasks, groupLabel, groupStudents } = require('../src/parse.js');
 
 test('cnToInt handles arabic and chinese numerals', () => {
   assert.equal(cnToInt('7'), 7);
@@ -63,5 +63,19 @@ test('groupStudents sorts by number and drops ungrouped', () => {
   assert.deepEqual(groupStudents(students), [
     { number: 2, members: ['B', 'D'] },
     { number: 10, members: ['A'] },
+  ]);
+});
+
+test('parseTasks reads optional counts', () => {
+  const text = '擦黑板\n打掃 2\n倒垃圾x3\n搬椅子×2人\n掃廁所, 2組\n報告3\n整理 ０\n\n Box 2 ';
+  assert.deepEqual(parseTasks(text), [
+    { name: '擦黑板', count: 1 },
+    { name: '打掃', count: 2 },
+    { name: '倒垃圾', count: 3 },
+    { name: '搬椅子', count: 2 },
+    { name: '掃廁所', count: 2 },
+    { name: '報告3', count: 1 },
+    { name: '整理 0', count: 1 },
+    { name: 'Box', count: 2 },
   ]);
 });

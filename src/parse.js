@@ -76,7 +76,22 @@
       .map(([number, members]) => ({ number, members }));
   }
 
-  const api = { cnToInt, parseLine, parseRoster, groupLabel, groupStudents, toHalfWidthDigits };
+  // "打掃 2", "打掃x2", "打掃×2人", "打掃, 2組". A bare trailing digit ("報告3") is part of the name.
+  const TASK_RE = /^(.+?)\s*(?:(?:(?<![A-Za-z])[xX]|[×*＊])\s*|[\s,，:：]+)(\d+)\s*[人組组個个]?$/;
+
+  function parseTasks(text) {
+    const tasks = [];
+    for (const raw of String(text).split(/\r?\n/)) {
+      const line = toHalfWidthDigits(raw).trim();
+      if (!line) continue;
+      const m = line.match(TASK_RE);
+      if (m && Number(m[2]) >= 1) tasks.push({ name: m[1].trim(), count: Number(m[2]) });
+      else tasks.push({ name: line, count: 1 });
+    }
+    return tasks;
+  }
+
+  const api = { cnToInt, parseLine, parseRoster, parseTasks, groupLabel, groupStudents, toHalfWidthDigits };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.DrawLots = Object.assign(root.DrawLots || {}, api);
 })(typeof globalThis !== 'undefined' ? globalThis : this);
