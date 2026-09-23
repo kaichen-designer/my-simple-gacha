@@ -118,7 +118,19 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   background: var(--globe);
   overflow: hidden;
 }
-.gacha-canvas { display: block; width: 100%; height: 100%; }
+.gacha-canvas { position: relative; display: block; width: 100%; height: 100%; }
+/* Exit hole at the bottom of the globe; its width follows the ball size (--hole, set in gacha.js). */
+.gacha-hole {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: var(--hole, 40px);
+  height: calc(var(--hole, 40px) * 0.45);
+  transform: translateX(-50%);
+  border-radius: 999px 999px 0 0;
+  background: var(--ink);
+}
+.gacha-glass, .gacha-collar, .gacha-floor, .cap-core, .fly-core { display: none; }
 .gacha-body {
   position: relative;
   width: 64%;
