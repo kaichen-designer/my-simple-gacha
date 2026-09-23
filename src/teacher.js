@@ -45,6 +45,9 @@
     walkA: ['...KPPPPPKKPPPPPK...', '...KPPPPK.KOOOOOK...', '..KOOOOOK.KKKKKKK...', '..KKKKKKK...........'],
     walkB: ['...KPPPPPKKPPPPPK...', '...KOOOOOK.KPPPPK...', '...KKKKKKK.KOOOOOK..', '...........KKKKKKK..'],
     tuck: ['...KPPPPPKKPPPPPK...', '...KOOOOOKKOOOOOK...', '...KKKKKKKKKKKKKK...', '....................'],
+    // Walking: one knee lifted high, the other foot planted.
+    stepL: ['...KPPPPPKKOOOOOK...', '...KPPPPK.KKKKKKK...', '..KOOOOOK...........', '..KKKKKKK...........'],
+    stepR: ['...KOOOOOKKPPPPPK...', '...KKKKKKK.KPPPPK...', '...........KOOOOOK..', '...........KKKKKKK..'],
   };
 
   // [row, col, cells] overwrites on the padded 24-wide frame.
@@ -56,6 +59,9 @@
     [19, 1, 'KNNN'], [19, 19, 'NNNK'],
     [23, 4, 'N'], [23, 19, 'N'], [24, 4, 'N'], [24, 19, 'N'],
   ];
+  // Arm swing while walking: one hand comes forward and up, outside the jacket.
+  const SWING_RIGHT = [[20, 20, 'K'], [21, 19, 'NSK'], [22, 19, 'NSK'], [23, 19, 'NK'], [24, 19, 'N']];
+  const SWING_LEFT = [[20, 3, 'K'], [21, 2, 'KSN'], [22, 2, 'KSN'], [23, 3, 'KN'], [24, 4, 'N']];
   const REACH_LOW = [
     [18, 19, 'KKKKK'], [19, 19, 'NNNSK'], [20, 19, 'NNNSK'], [21, 20, 'KKKK'],
     [23, 19, 'N'], [24, 19, 'N'],
@@ -80,8 +86,8 @@
   const FRAMES = {
     idle: frame(),
     blink: frame('stand', [], CLOSED_EYES),
-    walkA: frame('walkA'),
-    walkB: frame('walkB'),
+    walkA: frame('stepL', SWING_RIGHT),
+    walkB: frame('stepR', SWING_LEFT),
     jump: frame('tuck', ARMS_UP),
     climbA: frame('walkA', ARMS_UP),
     climbB: frame('walkB', ARMS_UP),
@@ -125,7 +131,9 @@
 
   // Puts the teacher (plus the ledge and ladder he climbs) into the gacha machine built by
   // createMachine. Returns the actor hooks the machine calls while dispensing.
-  function createTeacher(gachaEl) {
+  const NO_SFX = { play() {} };
+
+  function createTeacher(gachaEl, { sfx = NO_SFX } = {}) {
     const machine = gachaEl.querySelector('.gacha-machine');
     const body = gachaEl.querySelector('.gacha-body');
     const knob = gachaEl.querySelector('.gacha-knob');
@@ -154,17 +162,53 @@
       drawFrame(ctx, name, SCALE);
     }
 
-    // Alternates frames until stopped.
-    function cycle(names, every) {
+    // Alternates frames until stopped; onFrame runs for every frame shown.
+    function cycle(names, every, onFrame = () => {}) {
       stopCycle();
       let i = 0;
-      show(names[0]);
-      looping = setInterval(() => show(names[++i % names.length]), every);
+      const step = () => {
+        const name = names[i++ % names.length];
+        show(name);
+        onFrame(name);
+      };
+      step();
+      looping = setInterval(step, every);
     }
 
     function stopCycle() {
       if (looping) clearInterval(looping);
       looping = null;
+      canvas.style.transform = '';
+    }
+
+    // Where the sprite is right now, including mid-animation.
+    function currentPos() {
+      const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+      return { x: m.m41, y: m.m42 };
+    }
+
+    // A small pixel dust cloud under the planted foot.
+    function puff(col) {
+      const p = currentPos();
+      const dust = document.createElement('div');
+      dust.className = 'teacher-dust';
+      dust.style.left = p.x + col * SCALE + 'px';
+      dust.style.top = p.y + SPRITE_H - 2 * SCALE + 'px';
+      machine.append(dust);
+      dust.animate(
+        [{ transform: 'scale(0.6)', opacity: 1 }, { transform: 'translateY(-6px) scale(1.4)', opacity: 0 }],
+        { duration: 320, easing: 'steps(4)' },
+      ).finished.then(() => dust.remove());
+    }
+
+    // Stride frames with a bounce on the passing frames, dust and a footstep sound.
+    function walking() {
+      cycle(['walkA', 'idle', 'walkB', 'idle'], 130, name => {
+        canvas.style.transform = name === 'idle' ? `translateY(-${SCALE}px)` : '';
+        if (name === 'idle') return;
+        sfx.play('step');
+        puff(name === 'walkA' ? 4 : 15);
+      });
     }
 
     function rel(target) {
@@ -251,14 +295,15 @@
       bubble.hidden = true;
       if (spot === 'off') {
         el.style.opacity = '1';
-        cycle(['walkA', 'idle', 'walkB', 'idle'], 110);
-        await move(L.stand, 1000);
+        walking();
+        await move(L.stand, 1100);
         idle();
         await wait(150);
         spot = 'floor';
       }
       if (spot === 'floor') {
         show('jump');
+        sfx.play('jump');
         const peak = { x: (pos.x + L.ledge.x) / 2, y: Math.min(pos.y, L.ledge.y) - 10 * SCALE };
         await el.animate([
           { transform: `translate(${pos.x}px, ${pos.y}px)` },
@@ -272,7 +317,7 @@
     }
 
     async function crank(ms) {
-      cycle(['crankA', 'crankB'], 170);
+      cycle(['crankA', 'crankB'], 170, () => sfx.play('crank'));
       await wait(ms);
       stopCycle();
       show('crankA');
@@ -284,10 +329,10 @@
       const L = layout();
       show('climbA');
       await move({ x: L.ladderX, y: pos.y }, 160);
-      cycle(['climbA', 'climbB'], 120);
+      cycle(['climbA', 'climbB'], 120, () => sfx.play('step'));
       await move({ x: L.ladderX, y: L.floorY }, 700);
-      cycle(['walkA', 'idle', 'walkB', 'idle'], 100);
-      await move(L.stand, 300);
+      walking();
+      await move(L.stand, 400);
       spot = 'floor';
       idle();
     }
@@ -295,6 +340,7 @@
     async function celebrate() {
       bubble.hidden = false;
       show('jump');
+      sfx.play('cheer');
       await el.animate(
         [{ transform: `translate(${pos.x}px, ${pos.y}px)` },
           { transform: `translate(${pos.x}px, ${pos.y - 6 * SCALE}px)` },

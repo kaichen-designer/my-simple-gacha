@@ -42,6 +42,16 @@ test('arms-up and crank poses reach beyond the body', () => {
   assert.notDeepEqual(FRAMES.crankA, FRAMES.crankB);
 });
 
+test('walking frames lift one foot and swing an arm', () => {
+  const shoesOnGround = f => (f[FRAME_H - 2].match(/O/g) || []).length;
+  const armRows = f => f.slice(20, 25).join('');
+  for (const name of ['walkA', 'walkB']) {
+    assert.ok(shoesOnGround(FRAMES[name]) < shoesOnGround(FRAMES.idle), `${name} lifts a foot`);
+    assert.notEqual(armRows(FRAMES[name]), armRows(FRAMES.idle), `${name} swings an arm`);
+  }
+  assert.notDeepEqual(FRAMES.walkA, FRAMES.walkB);
+});
+
 test('blink only changes the eyes', () => {
   const diff = FRAMES.idle.map((row, y) => (row === FRAMES.blink[y] ? null : y)).filter(y => y !== null);
   assert.equal(diff.length, 1);

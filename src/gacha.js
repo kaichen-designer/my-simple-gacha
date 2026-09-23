@@ -138,7 +138,13 @@
       <div class="capsule" hidden>
         <div class="cap-top"></div><div class="cap-bottom"></div>
       </div>
-      <div class="reveal-card" hidden><div class="reveal-label"></div><div class="reveal-detail"></div></div>
+      <div class="reveal-card" hidden>
+        <div class="quest-banner">★ 任務指派 ★</div>
+        <div class="quest-task"></div>
+        <div class="reveal-label"></div>
+        <div class="reveal-detail"></div>
+      </div>
+      <div class="gacha-flash" aria-hidden="true" hidden></div>
     </div>`;
 
   const BLOW_MS = 800;
@@ -220,7 +226,11 @@
 
   // Builds the machine inside `container`. The globe always shows exactly the balls given to
   // setBalls minus those dispensed since.
-  function createMachine(container) {
+  const NO_SFX = { play() {} };
+  const TYPE_MS = 90;
+  const STAR_COLORS = ['#ffcd75', '#f4f4f4', '#73eff7', '#ef7d57'];
+
+  function createMachine(container, { sfx = NO_SFX } = {}) {
     container.classList.add('gacha');
     container.innerHTML = MACHINE_HTML;
     const q = sel => container.querySelector(sel);
@@ -333,7 +343,7 @@
     // Lets the chosen ball roll through the bottom hole; resolves once it has left the globe.
     function rollOut(ball) {
       return new Promise(resolve => {
-        const done = () => { clearTimeout(timer); exit = null; resolve(); };
+        const done = () => { clearTimeout(timer); exit = null; sfx.play('drop'); resolve(); };
         const timer = setTimeout(done, EXIT_TIMEOUT_MS);
         ball.exiting = true;
         exit = { ball, resolve: done };
@@ -352,6 +362,7 @@
       el.style.width = el.style.height = d + 'px';
       container.append(el);
       const rollTurns = Math.abs(to.x - from.x) / (Math.PI * d);
+      setTimeout(() => sfx.play('roll'), 400);
       const at = (x, y, turns = 0, s = 1) =>
         `translate(${x - d / 2}px, ${y - d / 2}px) rotate(${turns * 360}deg) scale(${s})`;
       await el.animate([
@@ -368,20 +379,61 @@
       el.style.setProperty('--sprite', pixelSprite(color));
     }
 
-    async function openCapsule(item, color, reduce) {
-      q('.reveal-label').textContent = item.label;
-      q('.reveal-detail').textContent = item.detail;
+    // A burst of pixel stars around the card.
+    function stars() {
+      const box = relRect(reveal);
+      for (let i = 0; i < 14; i++) {
+        const star = document.createElement('div');
+        star.className = 'quest-star';
+        star.style.background = STAR_COLORS[i % STAR_COLORS.length];
+        star.style.left = box.x + 'px';
+        star.style.top = box.y + 'px';
+        container.append(star);
+        const angle = (i / 14) * Math.PI * 2 + Math.random() * 0.3;
+        const dist = 150 + Math.random() * 90;
+        star.animate([
+          { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+          { transform: `translate(calc(-50% + ${Math.cos(angle) * dist}px), calc(-50% + ${Math.sin(angle) * dist * 0.6}px)) scale(0.4)`, opacity: 0 },
+        ], { duration: 700, easing: 'steps(7)' }).finished.then(() => star.remove());
+      }
+    }
+
+    // Types the label one character at a time, with a blip per character.
+    async function typeLabel(text) {
+      const label = q('.reveal-label');
+      label.textContent = '';
+      for (const ch of text) {
+        label.textContent += ch;
+        sfx.play('blip');
+        await wait(TYPE_MS);
+      }
+    }
+
+    // Opens the capsule like a pixel game's quest announcement: flash, banner, the task,
+    // the winner typed out, the members, then a burst of stars.
+    async function openCapsule(item, color, reduce, taskName) {
+      const detail = q('.reveal-detail');
+      q('.quest-task').textContent = taskName ? `【${taskName}】` : '';
       hint.hidden = true;
       if (reduce) {
+        q('.reveal-label').textContent = item.label;
+        detail.textContent = item.detail;
         card.hidden = false;
         return;
       }
+      q('.reveal-label').textContent = '';
+      detail.textContent = '';
       setSprite(capsule, color);
       capsule.hidden = false;
       await capsule.animate(
         [{ transform: 'rotate(0)' }, { transform: 'rotate(-10deg)' }, { transform: 'rotate(8deg)' }, { transform: 'rotate(0)' }],
         { duration: 450, easing: 'ease-in-out' },
       ).finished;
+      sfx.play('pop');
+      const flash = q('.gacha-flash');
+      flash.hidden = false;
+      flash.animate([{ opacity: 0.9 }, { opacity: 0 }], { duration: 260, easing: 'steps(4)' })
+        .finished.then(() => { flash.hidden = true; });
       const opts = { duration: 600, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' };
       const parts = [
         q('.cap-top').animate([
@@ -396,19 +448,29 @@
         ], opts),
       ];
       card.hidden = false;
+      card.classList.remove('blink');
       const pop = card.animate([
-        { transform: 'translateY(30px) scale(0.2)', opacity: 0 },
-        { transform: 'translateY(-6px) scale(1.06)', opacity: 1, offset: 0.7 },
+        { transform: 'scale(0.2)', opacity: 0 },
+        { transform: 'scale(1.08)', opacity: 1, offset: 0.7 },
         { transform: 'none', opacity: 1 },
-      ], { duration: 600, delay: 150, easing: 'cubic-bezier(.34,1.4,.64,1)', fill: 'backwards' });
-      await Promise.all([...parts.map(a => a.finished), pop.finished]);
+      ], { duration: 450, delay: 120, easing: 'steps(6)', fill: 'backwards' });
+      q('.quest-banner').animate([{ transform: 'translateY(-60px)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+        { duration: 400, delay: 250, easing: 'steps(5)', fill: 'backwards' });
+      setTimeout(() => sfx.play('fanfare'), 200);
+      await pop.finished;
       parts.forEach(a => a.cancel());
       capsule.hidden = true;
+      await wait(250);
+      await typeLabel(item.label);
+      detail.textContent = item.detail;
+      await detail.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, easing: 'steps(3)' }).finished;
+      stars();
+      card.classList.add('blink');
     }
 
     // Blows the balls up, lets them settle, rolls `item`'s ball out through the bottom hole and
     // the chute, then opens it. Resolves when the card is shown.
-    async function dispense(item) {
+    async function dispense(item, { task } = {}) {
       const reduce = prefersReducedMotion();
       const color = ballColor(item.group);
       showHint();
@@ -422,6 +484,7 @@
           { duration: BLOW_MS + SETTLE_MS, easing: 'ease-in-out' });
         if (actor) actor.crank(BLOW_MS + SETTLE_MS);
         blowUntil = performance.now() + BLOW_MS;
+        sfx.play('blow');
         await wait(BLOW_MS + SETTLE_MS);
         // The teacher climbs down while the ball rolls out.
         if (actor) down = actor.climbDown();
@@ -431,7 +494,7 @@
       updateCount();
       if (!reduce) await chuteToReveal(color, d);
       if (down) await down;
-      await openCapsule(item, color, reduce);
+      await openCapsule(item, color, reduce, task);
       if (actor && !reduce) actor.celebrate();
     }
 

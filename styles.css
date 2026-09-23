@@ -217,3 +217,32 @@ body[data-screen="draw"] .draw-side, body[data-screen="summary"] table.summary {
 }
 body[data-screen="draw"] .chips li { border-radius: 0; }
 body[data-screen="draw"] .shortfall { border-radius: 0; }
+
+/* Quest-style reveal: banner, task line, typed winner, blinking frame, flash and stars. */
+.reveal-card { padding: 40px 32px 24px; text-align: center; }
+.quest-banner {
+  position: absolute; top: -24px; left: 0; right: 0; width: max-content; margin: 0 auto;
+  padding: 4px 18px; font-size: 1.25rem; letter-spacing: 2px; background: #b13e53; color: #ffcd75;
+  box-shadow: 0 -4px 0 #1a1c2c, 0 4px 0 #1a1c2c, -4px 0 0 #1a1c2c, 4px 0 0 #1a1c2c, inset 0 4px 0 #ef7d57;
+}
+.quest-task { font-size: 1.5rem; color: #333c57; margin-bottom: 6px; }
+.reveal-label { min-height: 1.15em; }
+.reveal-card.blink { animation: quest-blink 0.5s steps(1) 4; }
+@keyframes quest-blink {
+  50% {
+    box-shadow: 0 -6px 0 #ffcd75, 0 6px 0 #ffcd75, -6px 0 0 #ffcd75, 6px 0 0 #ffcd75,
+      inset -6px -6px 0 #94b0c2, 10px 10px 0 #0b0c18;
+  }
+}
+.gacha-flash { position: absolute; inset: -16px; z-index: 6; background: #ffffff; pointer-events: none; }
+.quest-star {
+  position: absolute; z-index: 7; width: 16px; height: 16px; pointer-events: none;
+  clip-path: polygon(33% 0, 67% 0, 67% 33%, 100% 33%, 100% 67%, 67% 67%, 67% 100%, 33% 100%, 33% 67%, 0 67%, 0 33%, 33% 33%);
+}
+.teacher-dust {
+  position: absolute; z-index: 3; width: 8px; height: 4px; background: #94b0c2; pointer-events: none;
+  box-shadow: -8px 4px 0 #94b0c2, 8px 4px 0 #94b0c2;
+}
+.draw-main { position: relative; }
+.mute { position: absolute; top: 0; right: 0; font-size: 1rem; padding: 6px 12px; }
+@media (prefers-reduced-motion: reduce) { .reveal-card.blink { animation: none; } }

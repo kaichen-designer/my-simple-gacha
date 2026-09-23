@@ -228,11 +228,17 @@
     $('next').disabled = true;
     state.session = D.drawOne(state.session);
     const winners = D.currentResult(state.session).winners;
-    await state.machine.dispense(winners[winners.length - 1]);
+    await state.machine.dispense(winners[winners.length - 1], { task: D.currentTask(state.session).name });
     state.busy = false;
     $('draw').disabled = false;
     $('next').disabled = false;
     renderDraw();
+  }
+
+  function renderMute() {
+    const muted = state.sfx.muted;
+    $('mute').textContent = muted ? '🔇 靜音' : '🔊 音效';
+    $('mute').setAttribute('aria-pressed', String(muted));
   }
 
   function onNext() {
@@ -264,7 +270,13 @@
   $('next').addEventListener('click', onNext);
   $('redraw').addEventListener('click', startSession);
   $('back').addEventListener('click', () => showScreen('setup'));
-  state.machine = D.createMachine($('gacha'));
-  state.machine.setActor(D.createTeacher($('gacha')));
+  $('mute').addEventListener('click', () => {
+    state.sfx.setMuted(!state.sfx.muted);
+    renderMute();
+  });
+  state.sfx = D.createSfx();
+  state.machine = D.createMachine($('gacha'), { sfx: state.sfx });
+  state.machine.setActor(D.createTeacher($('gacha'), { sfx: state.sfx }));
+  renderMute();
   refreshSetup();
 })();
