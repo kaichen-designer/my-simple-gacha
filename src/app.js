@@ -19,8 +19,11 @@
   function renderPreview(roster) {
     const groups = D.groupStudents(roster.students);
     const ungrouped = roster.students.filter(s => s.group === null);
-    const rows = groups.map(g =>
-      el('li', `${D.groupLabel(g.number)}（${g.members.length}人）：${g.members.join('、')}`));
+    const rows = groups.map(g => {
+      const li = el('li');
+      li.append(groupDot(g.number), `${D.groupLabel(g.number)}（${g.members.length}人）：${g.members.join('、')}`);
+      return li;
+    });
     if (ungrouped.length) {
       rows.push(el('li', `未分組：${ungrouped.map(s => s.name).join('、')}`, 'ungrouped'));
     }
@@ -52,6 +55,7 @@
     const numCell = el('td', undefined, 'num');
     const numInput = input('c-num', cfg.num, num, cfg.numPlaceholder);
     numInput.inputMode = 'numeric';
+    if (bodyId === 'roster-body') numCell.append(el('span', undefined, 'c-dot'));
     numCell.append(numInput);
     const delCell = el('td', undefined, 'del');
     const del = el('button', '✕', 'row-del');
@@ -112,11 +116,22 @@
     if (open) $('paste-text').focus();
   }
 
-  function markUngroupedRows() {
+  // Yellow group cell when a named student has no group; otherwise a capsule in the group's colour.
+  function paintRosterRows() {
     for (const tr of $('roster-body').rows) {
       const named = tr.querySelector('.c-name').value.trim() !== '';
-      tr.classList.toggle('ungrouped-row', named && D.positiveInt(tr.querySelector('.c-num').value) === null);
+      const group = D.positiveInt(tr.querySelector('.c-num').value);
+      tr.classList.toggle('ungrouped-row', named && group === null);
+      const capsule = tr.querySelector('.c-dot');
+      if (group === null) capsule.style.removeProperty('background');
+      else capsule.style.background = D.ballColor(group);
     }
+  }
+
+  function groupDot(group) {
+    const d = el('span', undefined, 'c-dot');
+    d.style.background = D.ballColor(group);
+    return d;
   }
 
   function refreshSetup() {
@@ -125,7 +140,7 @@
     const tasks = D.rowsToTasks(readRows('tasks-body'));
     const pool = D.buildPool(mode, roster.students);
     renderPreview(roster);
-    markUngroupedRows();
+    paintRosterRows();
 
     const { errors, warnings } = D.validateSetup(mode, pool, tasks);
     const messages = [
@@ -274,6 +289,20 @@
     state.sfx.setMuted(!state.sfx.muted);
     renderMute();
   });
+  function setupTeacher() {
+    const cv = $('setup-teacher');
+    const scale = 4;
+    cv.width = D.FRAME_W * scale;
+    cv.height = D.FRAME_H * scale;
+    const ctx = cv.getContext('2d');
+    D.drawFrame(ctx, 'idle', scale);
+    setInterval(() => {
+      D.drawFrame(ctx, 'blink', scale);
+      setTimeout(() => D.drawFrame(ctx, 'idle', scale), 140);
+    }, 3200);
+  }
+
+  setupTeacher();
   state.sfx = D.createSfx();
   state.machine = D.createMachine($('gacha'), { sfx: state.sfx });
   state.machine.setActor(D.createTeacher($('gacha'), { sfx: state.sfx }));

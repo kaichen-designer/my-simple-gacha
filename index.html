@@ -10,7 +10,10 @@
 <body data-screen="setup">
   <main>
     <section id="setup-screen" class="screen">
-      <h1>任務抽籤</h1>
+      <div class="setup-head">
+        <canvas id="setup-teacher" aria-hidden="true"></canvas>
+        <h1 class="logo">任務抽籤</h1>
+      </div>
       <fieldset class="mode">
         <legend>抽籤方式</legend>
         <label><input type="radio" name="mode" value="group" checked> 抽組</label>
@@ -45,7 +48,7 @@
         </div>
       </div>
       <ul id="messages" class="messages"></ul>
-      <button id="start" type="button" class="primary" disabled>開始抽籤</button>
+      <button id="start" type="button" class="primary" disabled><span class="arrow" aria-hidden="true">▶</span> 開始抽籤</button>
     </section>
 
     <section id="draw-screen" class="screen" hidden>
