@@ -40,6 +40,31 @@ fieldset.mode label { margin-right: 24px; font-size: 1.2rem; }
 .setup-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 24px; }
 @media (max-width: 720px) { .setup-grid { grid-template-columns: 1fr; } }
 .field label { display: block; font-weight: 600; margin-bottom: 6px; }
+.field-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.field-head h2 { font-size: 1.4rem; margin: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.paste-panel { background: var(--panel); border: 1px dashed var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+.paste-panel textarea { margin-bottom: 8px; }
+.paste-result { margin: 8px 0 0; color: var(--muted); }
+table.grid { width: 100%; border-collapse: collapse; background: var(--panel); margin-bottom: 8px; }
+table.grid th { text-align: left; font-size: 0.95rem; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--border); }
+table.grid td { padding: 4px; border-bottom: 1px solid var(--border); }
+table.grid th.num, table.grid td.num { width: 6.5em; }
+table.grid th.del, table.grid td.del { width: 2.8em; text-align: center; }
+table.grid input {
+  width: 100%;
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+}
+table.grid input:focus { border-color: var(--accent); outline: none; background: var(--bg); }
+tr.ungrouped-row td.num input { background: var(--warn-bg); color: var(--warn-text); }
+button.small { font-size: 1rem; padding: 6px 14px; border-radius: 8px; }
+button.row-del { font-size: 1rem; padding: 4px 8px; border: none; background: transparent; color: var(--muted); }
+button.row-del:hover { color: var(--error-text); }
 textarea {
   width: 100%;
   font: inherit;

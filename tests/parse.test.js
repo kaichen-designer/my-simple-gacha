@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cnToInt, parseLine, parseRoster, parseTasks, groupLabel, groupStudents } = require('../src/parse.js');
+const { cnToInt, parseLine, parseRoster, rowsToStudents, rowsToTasks, groupLabel, groupStudents } = require('../src/parse.js');
 
 test('cnToInt handles arabic and chinese numerals', () => {
   assert.equal(cnToInt('7'), 7);
@@ -65,17 +65,40 @@ test('groupStudents sorts by number and drops ungrouped', () => {
     { number: 10, members: ['A'] },
   ]);
 });
+test('rowsToStudents trims, skips blanks, parses groups and reports duplicates', () => {
+  const rows = [
+    { name: ' 王小明 ', group: '1' },
+    { name: '', group: '2' },
+    { name: '李大華', group: '' },
+    { name: '陳美美', group: '０３' },
+    { name: '林小華', group: '0' },
+    { name: '張三', group: 'abc' },
+    { name: '王小明', group: '2' },
+  ];
+  assert.deepEqual(rowsToStudents(rows), {
+    students: [
+      { name: '王小明', group: 1 },
+      { name: '李大華', group: null },
+      { name: '陳美美', group: 3 },
+      { name: '林小華', group: null },
+      { name: '張三', group: null },
+    ],
+    duplicates: ['王小明'],
+  });
+});
 
-test('parseTasks reads optional counts', () => {
-  const text = '擦黑板\n打掃 2\n倒垃圾x3\n搬椅子×2人\n掃廁所, 2組\n報告3\n整理 ０\n\n Box 2 ';
-  assert.deepEqual(parseTasks(text), [
+test('rowsToTasks skips blank names and defaults invalid counts to 1', () => {
+  const rows = [
+    { name: '擦黑板', count: '' },
+    { name: ' 打掃 ', count: '2' },
+    { name: '', count: '3' },
+    { name: '倒垃圾', count: '0' },
+    { name: '搬椅子', count: '1.5' },
+  ];
+  assert.deepEqual(rowsToTasks(rows), [
     { name: '擦黑板', count: 1 },
     { name: '打掃', count: 2 },
-    { name: '倒垃圾', count: 3 },
-    { name: '搬椅子', count: 2 },
-    { name: '掃廁所', count: 2 },
-    { name: '報告3', count: 1 },
-    { name: '整理 0', count: 1 },
-    { name: 'Box', count: 2 },
+    { name: '倒垃圾', count: 1 },
+    { name: '搬椅子', count: 1 },
   ]);
 });

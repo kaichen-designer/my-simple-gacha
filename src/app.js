@@ -29,12 +29,103 @@
     $('preview').replaceChildren(el('p', `共 ${roster.students.length} 人、${groups.length} 組`), list);
   }
 
+  // Column config per editable table: first input is the text column, second the number column.
+  const TABLES = {
+    'roster-body': { name: '姓名', num: '組別', numKey: 'group', numPlaceholder: '未分組' },
+    'tasks-body': { name: '任務', num: '數量', numKey: 'count', numPlaceholder: '1' },
+  };
+
+  function input(className, label, value, placeholder) {
+    const e = el('input', undefined, className);
+    e.type = 'text';
+    e.value = value;
+    e.setAttribute('aria-label', label);
+    if (placeholder) e.placeholder = placeholder;
+    return e;
+  }
+
+  function addRow(bodyId, name = '', num = '') {
+    const cfg = TABLES[bodyId];
+    const tr = el('tr');
+    const nameCell = el('td');
+    nameCell.append(input('c-name', cfg.name, name));
+    const numCell = el('td', undefined, 'num');
+    const numInput = input('c-num', cfg.num, num, cfg.numPlaceholder);
+    numInput.inputMode = 'numeric';
+    numCell.append(numInput);
+    const delCell = el('td', undefined, 'del');
+    const del = el('button', '✕', 'row-del');
+    del.type = 'button';
+    del.setAttribute('aria-label', '刪除這一列');
+    delCell.append(del);
+    tr.append(nameCell, numCell, delCell);
+    $(bodyId).append(tr);
+    return tr;
+  }
+
+  function readRows(bodyId) {
+    const key = TABLES[bodyId].numKey;
+    return [...$(bodyId).rows].map(tr => ({
+      name: tr.querySelector('.c-name').value,
+      [key]: tr.querySelector('.c-num').value,
+    }));
+  }
+
+  function onTableClick(e) {
+    const del = e.target.closest('.row-del');
+    if (!del) return;
+    const body = e.currentTarget;
+    del.closest('tr').remove();
+    if (body.rows.length === 0) addRow(body.id);
+    refreshSetup();
+  }
+
+  // Enter moves to the next row's name cell, adding a row at the end.
+  function onTableKeydown(e) {
+    if (e.key !== 'Enter' || !e.target.matches('input')) return;
+    e.preventDefault();
+    const tr = e.target.closest('tr');
+    const next = tr.nextElementSibling || addRow(e.currentTarget.id);
+    next.querySelector('.c-name').focus();
+  }
+
+  function onPasteApply() {
+    const parsed = D.parseRoster($('paste-text').value);
+    const body = $('roster-body');
+    for (const tr of [...body.rows]) {
+      if (!tr.querySelector('.c-name').value.trim() && !tr.querySelector('.c-num').value.trim()) tr.remove();
+    }
+    for (const s of parsed.students) addRow('roster-body', s.name, s.group === null ? '' : String(s.group));
+    if (body.rows.length === 0) addRow('roster-body');
+    const notes = [`已填入 ${parsed.students.length} 位，可以直接在表格裡修改`];
+    if (parsed.duplicates.length) notes.push('重複的名字只填一次：' + parsed.duplicates.join('、'));
+    if (parsed.invalidLines.length) notes.push('這幾行找不到姓名，已略過：' + parsed.invalidLines.join('、'));
+    $('paste-result').textContent = notes.join('；');
+    $('paste-text').value = '';
+    refreshSetup();
+  }
+
+  function togglePaste() {
+    const open = $('paste-panel').hidden;
+    $('paste-panel').hidden = !open;
+    $('paste-toggle').setAttribute('aria-expanded', String(open));
+    if (open) $('paste-text').focus();
+  }
+
+  function markUngroupedRows() {
+    for (const tr of $('roster-body').rows) {
+      const named = tr.querySelector('.c-name').value.trim() !== '';
+      tr.classList.toggle('ungrouped-row', named && D.positiveInt(tr.querySelector('.c-num').value) === null);
+    }
+  }
+
   function refreshSetup() {
     const mode = currentMode();
-    const roster = D.parseRoster($('roster').value);
-    const tasks = D.parseTasks($('tasks').value);
+    const roster = D.rowsToStudents(readRows('roster-body'));
+    const tasks = D.rowsToTasks(readRows('tasks-body'));
     const pool = D.buildPool(mode, roster.students);
     renderPreview(roster);
+    markUngroupedRows();
 
     const { errors, warnings } = D.validateSetup(mode, pool, tasks);
     const messages = [
@@ -43,13 +134,10 @@
     ];
     const ungroupedCount = roster.students.filter(s => s.group === null).length;
     if (mode === 'group' && ungroupedCount > 0) {
-      messages.push({ text: `有 ${ungroupedCount} 人沒有辨識到組別，抽組時不會列入（見預覽黃色部分）`, cls: 'warning' });
+      messages.push({ text: `有 ${ungroupedCount} 人沒有填組別，抽組時不會列入（組別欄黃色的列）`, cls: 'warning' });
     }
     if (roster.duplicates.length) {
       messages.push({ text: '重複的名字只算一次：' + roster.duplicates.join('、'), cls: 'warning' });
-    }
-    if (roster.invalidLines.length) {
-      messages.push({ text: '這幾行找不到姓名，已略過：' + roster.invalidLines.join('、'), cls: 'warning' });
     }
     $('messages').replaceChildren(...messages.map(m => el('li', m.text, m.cls)));
     $('start').disabled = errors.length > 0;
@@ -146,8 +234,17 @@
     }
   }
 
-  $('roster').addEventListener('input', refreshSetup);
-  $('tasks').addEventListener('input', refreshSetup);
+  for (const bodyId of Object.keys(TABLES)) {
+    const body = $(bodyId);
+    body.addEventListener('input', refreshSetup);
+    body.addEventListener('click', onTableClick);
+    body.addEventListener('keydown', onTableKeydown);
+    addRow(bodyId);
+  }
+  $('roster-add').addEventListener('click', () => { addRow('roster-body').querySelector('.c-name').focus(); });
+  $('tasks-add').addEventListener('click', () => { addRow('tasks-body').querySelector('.c-name').focus(); });
+  $('paste-toggle').addEventListener('click', togglePaste);
+  $('paste-apply').addEventListener('click', onPasteApply);
   document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', refreshSetup));
   $('start').addEventListener('click', startSession);
   $('draw').addEventListener('click', onDraw);

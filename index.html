@@ -17,13 +17,30 @@
       </fieldset>
       <div class="setup-grid">
         <div class="field">
-          <label for="roster">名單（直接貼上 LINE 留言，一行一位）</label>
-          <textarea id="roster" rows="14" placeholder="第1組 王小明&#10;李大華 1組&#10;3 陳美美"></textarea>
+          <div class="field-head">
+            <h2>名單</h2>
+            <button id="paste-toggle" type="button" class="small" aria-expanded="false">從 LINE 貼上</button>
+          </div>
+          <div id="paste-panel" class="paste-panel" hidden>
+            <label for="paste-text">把 LINE 記事本的留言整段貼在這裡，一行一位</label>
+            <textarea id="paste-text" rows="6" placeholder="第1組 王小明&#10;李大華 1組&#10;3 陳美美"></textarea>
+            <button id="paste-apply" type="button" class="small primary">填入表格</button>
+            <p id="paste-result" class="paste-result" aria-live="polite"></p>
+          </div>
+          <table class="grid">
+            <thead><tr><th>姓名</th><th class="num">組別</th><th class="del"><span class="sr-only">刪除</span></th></tr></thead>
+            <tbody id="roster-body"></tbody>
+          </table>
+          <button id="roster-add" type="button" class="small">＋ 新增一列</button>
           <div id="preview" class="preview" aria-live="polite"></div>
         </div>
         <div class="field">
-          <label for="tasks">任務（一行一個，後面可加數量，例如「打掃 2」）</label>
-          <textarea id="tasks" rows="8" placeholder="擦黑板&#10;打掃 2&#10;倒垃圾"></textarea>
+          <div class="field-head"><h2>任務</h2></div>
+          <table class="grid">
+            <thead><tr><th>任務</th><th class="num">數量</th><th class="del"><span class="sr-only">刪除</span></th></tr></thead>
+            <tbody id="tasks-body"></tbody>
+          </table>
+          <button id="tasks-add" type="button" class="small">＋ 新增一列</button>
         </div>
       </div>
       <ul id="messages" class="messages"></ul>
