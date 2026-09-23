@@ -148,6 +148,7 @@
     for (const id of ['setup-screen', 'draw-screen', 'summary-screen']) {
       $(id).hidden = id !== name + '-screen';
     }
+    document.body.dataset.screen = name;
   }
 
   function unit() {
@@ -264,5 +265,6 @@
   $('redraw').addEventListener('click', startSession);
   $('back').addEventListener('click', () => showScreen('setup'));
   state.machine = D.createMachine($('gacha'));
+  state.machine.setActor(D.createTeacher($('gacha')));
   refreshSetup();
 })();

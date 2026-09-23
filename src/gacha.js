@@ -124,11 +124,7 @@
 
   const MACHINE_HTML = `
     <div class="gacha-machine">
-      <div class="gacha-globe">
-        <div class="gacha-hole" aria-hidden="true"></div>
-        <canvas class="gacha-canvas"></canvas>
-        <div class="gacha-glass" aria-hidden="true"></div>
-      </div>
+      <div class="gacha-globe"><canvas class="gacha-canvas"></canvas></div>
       <div class="gacha-collar" aria-hidden="true"></div>
       <div class="gacha-body">
         <div class="gacha-knob" aria-hidden="true"></div>
@@ -140,7 +136,7 @@
     <div class="gacha-reveal" aria-live="polite">
       <p class="reveal-hint">按「抽！」轉動扭蛋機</p>
       <div class="capsule" hidden>
-        <div class="cap-core"></div><div class="cap-top"></div><div class="cap-bottom"></div>
+        <div class="cap-top"></div><div class="cap-bottom"></div>
       </div>
       <div class="reveal-card" hidden><div class="reveal-label"></div><div class="reveal-detail"></div></div>
     </div>`;
@@ -149,108 +145,7 @@
   const SETTLE_MS = 600;
   const EXIT_TIMEOUT_MS = 2500;
 
-  function drawFlatBall(ctx, x, y, r, color) {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-    // Lighter top half reads as a two-part capsule.
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-    ctx.beginPath();
-    ctx.arc(x, y, r, Math.PI, 0);
-    ctx.fill();
-  }
-
-  // Clear glass shell with a glossy coloured ball inside, a tilted seam and rim highlights.
-  function drawGlassBall(ctx, x, y, r, color) {
-    const t = tones(color);
-    const cx = x - r * 0.04;
-    const cy = y + r * 0.1;
-    const cr = r * 0.7;
-    const core = ctx.createRadialGradient(cx - cr * 0.35, cy - cr * 0.4, cr * 0.1, cx, cy, cr);
-    core.addColorStop(0, t.light);
-    core.addColorStop(0.6, t.c);
-    core.addColorStop(1, t.dark);
-    ctx.fillStyle = core;
-    ctx.beginPath();
-    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
-    ctx.fill();
-    if (r > 9) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.92)';
-      ctx.lineCap = 'round';
-      ctx.lineWidth = Math.max(1.5, cr * 0.13);
-      for (const ex of [-0.22, 0.2]) {
-        ctx.beginPath();
-        ctx.moveTo(cx + cr * ex, cy - cr * 0.2);
-        ctx.lineTo(cx + cr * ex, cy + cr * 0.08);
-        ctx.stroke();
-      }
-    }
-    // Fresnel: the shell is clear in the middle and brighter towards the edge.
-    const shell = ctx.createRadialGradient(x, y, r * 0.55, x, y, r);
-    shell.addColorStop(0, 'rgba(255,255,255,0.02)');
-    shell.addColorStop(0.8, 'rgba(255,255,255,0.12)');
-    shell.addColorStop(1, 'rgba(255,255,255,0.45)');
-    ctx.fillStyle = shell;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = Math.max(1, r * 0.06);
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.stroke();
-    // Tilted seam ring.
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-    ctx.lineWidth = Math.max(1, r * 0.05);
-    ctx.beginPath();
-    ctx.ellipse(x, y, r * 0.96, r * 0.32, -0.38, 0, Math.PI);
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-    ctx.beginPath();
-    ctx.ellipse(x, y, r * 0.96, r * 0.32, -0.38, Math.PI, Math.PI * 2);
-    ctx.stroke();
-    // Specular streaks along the upper-right rim.
-    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
-    ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(1.2, r * 0.09);
-    for (const [a0, a1] of [[-1.75, -1.45], [-1.3, -1.12], [-0.95, -0.7]]) {
-      ctx.beginPath();
-      ctx.arc(x, y, r * 0.82, a0, a1);
-      ctx.stroke();
-    }
-  }
-
-  // Soft studio lighting: shaded sphere, lighter top shell, curved seam, contact shadow.
-  function drawShadedBall(ctx, x, y, r, color) {
-    const t = tones(color);
-    ctx.fillStyle = 'rgba(30,40,45,.16)';
-    ctx.beginPath();
-    ctx.ellipse(x + r * 0.12, y + r * 0.9, r * 0.75, r * 0.22, 0, 0, Math.PI * 2);
-    ctx.fill();
-    const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.08, x, y, r);
-    g.addColorStop(0, t.light);
-    g.addColorStop(0.55, t.c);
-    g.addColorStop(1, t.dark);
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.save();
-    ctx.clip();
-    ctx.fillStyle = 'rgba(255,255,255,.26)';
-    ctx.fillRect(x - r, y - r, r * 2, r);
-    ctx.strokeStyle = 'rgba(0,0,0,.2)';
-    ctx.lineWidth = Math.max(1, r * 0.07);
-    ctx.beginPath();
-    ctx.ellipse(x, y, r, r * 0.2, 0, 0, Math.PI);
-    ctx.stroke();
-    ctx.restore();
-    ctx.fillStyle = 'rgba(255,255,255,.75)';
-    ctx.beginPath();
-    ctx.ellipse(x - r * 0.38, y - r * 0.45, r * 0.24, r * 0.14, -0.6, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  const PIX = 4; // CSS px per "pixel" in the pixel style
+  const PIX = 4; // CSS px per "pixel"
   const PIXEL_INK = '#1a1c2c';
 
   // Pixel-art capsule: hard outline, lighter top half, dark seam row and a white glint.
@@ -277,33 +172,40 @@
     }
   }
 
-  // Pixel globe: dark glass fill, light outline, black exit hole at the bottom.
+  const RIM = PIX * 2; // thickness of the globe's outline
+
+  // Pixel globe, back layer: dark glass fill and the black exit hole in the rim.
+  // R is the inner radius the balls live in; the rim sits just outside it.
   function drawPixelGlobe(ctx, c, R, hole) {
+    const outer = R + RIM;
     for (let py = 0; py < c * 2; py += PIX) {
       for (let px = 0; px < c * 2; px += PIX) {
         const dx = px + PIX / 2 - c;
         const dy = py + PIX / 2 - c;
         const d = Math.hypot(dx, dy);
-        if (d > R) continue;
-        let fill = '#29366f';
-        if (dy > 0 && Math.abs(dx) < hole && d > R - PIX * 3) fill = '#000000';
-        else if (d > R - PIX * 2) fill = '#f4f4f4';
-        ctx.fillStyle = fill;
+        if (d > outer) continue;
+        ctx.fillStyle = dy > 0 && Math.abs(dx) < hole && d > R - PIX ? '#000000' : '#29366f';
         ctx.fillRect(px, py, PIX, PIX);
       }
     }
   }
 
-  // Glass glint drawn over the balls.
-  function drawPixelShine(ctx, c, R) {
-    ctx.fillStyle = '#ffffff';
+  // Front layer, drawn over the balls: the rim (open at the hole) and a glass glint, so no
+  // ball ever appears to poke out of the globe.
+  function drawPixelRim(ctx, c, R, hole) {
+    const outer = R + RIM;
     for (let py = 0; py < c * 2; py += PIX) {
       for (let px = 0; px < c * 2; px += PIX) {
         const dx = px + PIX / 2 - c;
         const dy = py + PIX / 2 - c;
         const d = Math.hypot(dx, dy);
+        if (d > outer) continue;
+        const inHole = dy > 0 && Math.abs(dx) < hole;
         const a = Math.atan2(dy, dx);
-        if (d > R - PIX * 5 && d < R - PIX * 3 && a > -2.7 && a < -2.0) ctx.fillRect(px, py, PIX, PIX);
+        if (d > R && !inHole) ctx.fillStyle = '#f4f4f4';
+        else if (d > R - PIX * 3 && d < R - PIX && a > -2.7 && a < -2.0) ctx.fillStyle = '#ffffff';
+        else continue;
+        ctx.fillRect(px, py, PIX, PIX);
       }
     }
   }
@@ -316,21 +218,11 @@
     return `url(${cv.toDataURL()})`;
   }
 
-  // Each style paints balls on the canvas; `back`/`front` draw the globe itself where CSS can't.
-  const STYLES = {
-    flat: { ball: drawFlatBall },
-    shaded: { ball: drawShadedBall },
-    glass: { ball: drawGlassBall },
-    pixel: { ball: drawPixelBall, back: drawPixelGlobe, front: drawPixelShine, sprite: true },
-  };
-
   // Builds the machine inside `container`. The globe always shows exactly the balls given to
-  // setBalls minus those dispensed since. `style` picks the look ('flat' or 'glass').
-  function createMachine(container, { style = 'flat' } = {}) {
+  // setBalls minus those dispensed since.
+  function createMachine(container) {
     container.classList.add('gacha');
-    container.dataset.style = style;
     container.innerHTML = MACHINE_HTML;
-    const look = STYLES[style] || STYLES.flat;
     const q = sel => container.querySelector(sel);
     const globe = q('.gacha-globe');
     const canvas = q('.gacha-canvas');
@@ -352,6 +244,7 @@
     let exit = null; // { ball, resolve } while a ball is on its way out
     let last = performance.now();
     let running = true;
+    let actor = null; // optional { reset, climbUp, crank, climbDown, celebrate }
 
     function resize() {
       const newSize = globe.clientWidth;
@@ -360,7 +253,7 @@
       canvas.width = Math.round(newSize * dpr);
       canvas.height = Math.round(newSize * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const newR = newSize / 2 - 4;
+      const newR = newSize / 2 - 4 - RIM;
       const scale = R ? newR / R : 1;
       for (const b of balls) { b.x *= scale; b.y *= scale; b.r *= scale; }
       size = newSize;
@@ -371,7 +264,6 @@
     // The hole is sized for the current balls so one can just pass through.
     function setHole(r) {
       hole = r * 1.35;
-      globe.style.setProperty('--hole', hole * 2 + 'px');
     }
 
     function updateCount() {
@@ -381,11 +273,11 @@
     function draw() {
       ctx.clearRect(0, 0, size, size);
       const c = size / 2;
-      if (look.back) look.back(ctx, c, R, hole);
+      drawPixelGlobe(ctx, c, R, hole);
       const clip = { c, R };
       // Back to front, so lower balls overlap the ones behind them.
-      for (const b of [...balls].sort((a, b2) => a.y - b2.y)) look.ball(ctx, c + b.x, c + b.y, b.r, b.color, clip);
-      if (look.front) look.front(ctx, c, R);
+      for (const b of [...balls].sort((a, b2) => a.y - b2.y)) drawPixelBall(ctx, c + b.x, c + b.y, b.r, b.color, clip);
+      drawPixelRim(ctx, c, R, hole);
     }
 
     function frame(now) {
@@ -424,6 +316,7 @@
       setHole(r);
       updateCount();
       showHint();
+      if (actor) actor.reset();
     }
 
     function relRect(el) {
@@ -455,8 +348,7 @@
       const endSize = capsule.offsetWidth || 160;
       const el = document.createElement('div');
       el.className = 'fly-ball';
-      setTones(el, color);
-      el.innerHTML = '<div class="fly-core"></div>';
+      setSprite(el, color);
       el.style.width = el.style.height = d + 'px';
       container.append(el);
       const rollTurns = Math.abs(to.x - from.x) / (Math.PI * d);
@@ -472,12 +364,8 @@
       el.remove();
     }
 
-    function setTones(el, color) {
-      const t = tones(color);
-      el.style.setProperty('--cap', t.c);
-      el.style.setProperty('--cap-light', t.light);
-      el.style.setProperty('--cap-dark', t.dark);
-      if (look.sprite) el.style.setProperty('--sprite', pixelSprite(color));
+    function setSprite(el, color) {
+      el.style.setProperty('--sprite', pixelSprite(color));
     }
 
     async function openCapsule(item, color, reduce) {
@@ -488,7 +376,7 @@
         card.hidden = false;
         return;
       }
-      setTones(capsule, color);
+      setSprite(capsule, color);
       capsule.hidden = false;
       await capsule.animate(
         [{ transform: 'rotate(0)' }, { transform: 'rotate(-10deg)' }, { transform: 'rotate(8deg)' }, { transform: 'rotate(0)' }],
@@ -506,9 +394,6 @@
           { transform: 'translateY(20px)', opacity: 1, offset: 0.5 },
           { transform: 'translateY(70px)', opacity: 0 },
         ], opts),
-        q('.cap-core').animate([
-          { transform: 'none', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 },
-        ], { duration: 350, easing: 'ease-in', fill: 'forwards' }),
       ];
       card.hidden = false;
       const pop = card.animate([
@@ -530,17 +415,28 @@
       hint.hidden = true;
       const ball = balls.find(b => b.id === item.id);
       const d = Math.max(20, ball ? ball.r * 2 : 24);
+      let down = null;
       if (!reduce && ball) {
+        if (actor) await actor.climbUp();
         knob.animate([{ transform: 'rotate(0)' }, { transform: 'rotate(360deg)' }],
           { duration: BLOW_MS + SETTLE_MS, easing: 'ease-in-out' });
+        if (actor) actor.crank(BLOW_MS + SETTLE_MS);
         blowUntil = performance.now() + BLOW_MS;
         await wait(BLOW_MS + SETTLE_MS);
+        // The teacher climbs down while the ball rolls out.
+        if (actor) down = actor.climbDown();
         await rollOut(ball);
       }
       balls = balls.filter(b => b.id !== item.id);
       updateCount();
       if (!reduce) await chuteToReveal(color, d);
+      if (down) await down;
       await openCapsule(item, color, reduce);
+      if (actor && !reduce) actor.celebrate();
+    }
+
+    function setActor(a) {
+      actor = a;
     }
 
     const observer = new ResizeObserver(resize);
@@ -553,7 +449,7 @@
       container.replaceChildren();
     }
 
-    return { setBalls, dispense, showHint, destroy };
+    return { setBalls, dispense, showHint, setActor, destroy };
   }
 
   const api = { PALETTE, UNGROUPED_COLOR, ballColor, ballRadius, tones, applyBlow, stepPhysics, createMachine };

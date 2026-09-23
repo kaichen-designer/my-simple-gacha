@@ -9,8 +9,6 @@
   --warn-bg: #fff4c2;
   --warn-text: #7a5a00;
   --error-text: #b91c1c;
-  --ink: #2f3437;
-  --globe: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -24,8 +22,6 @@
     --warn-bg: #4a3b00;
     --warn-text: #ffe28a;
     --error-text: #f87171;
-    --ink: #d9d9d4;
-    --globe: #26262b;
   }
 }
 * { box-sizing: border-box; }
@@ -104,101 +100,87 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .task-title { font-size: clamp(2.5rem, 6vw, 4.5rem); margin: 8px 0; }
 .task-count { font-size: 1.5rem; color: var(--muted); margin: 0 0 16px; }
 
-/* Gacha machine: flat shapes, one ink colour, capsules from the palette in gacha.js. */
-.gacha { position: relative; display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: 32px; align-items: center; }
-@media (max-width: 720px) { .gacha { grid-template-columns: 1fr; justify-items: center; } }
-.gacha-machine { width: 100%; max-width: 320px; display: flex; flex-direction: column; align-items: center; }
-.gacha-globe {
+/* Gacha machine, pixel art. The globe and capsules are drawn by gacha.js in 4px blocks;
+   the machine parts below use the same block size and palette. */
+.gacha { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 32px; align-items: center; image-rendering: pixelated; }
+@media (max-width: 760px) { .gacha { grid-template-columns: 1fr; justify-items: center; } }
+/* The padding on the left is the teacher's floor space. */
+.gacha-machine {
   position: relative;
-  z-index: 1;
-  width: 100%;
-  aspect-ratio: 1;
-  border: 3px solid var(--ink);
-  border-radius: 50%;
-  background: var(--globe);
-  overflow: hidden;
+  width: 300px;
+  padding-left: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: content-box;
 }
-.gacha-canvas { position: relative; display: block; width: 100%; height: 100%; }
-/* Exit hole at the bottom of the globe; its width follows the ball size (--hole, set in gacha.js). */
-.gacha-hole {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: var(--hole, 40px);
-  height: calc(var(--hole, 40px) * 0.45);
-  transform: translateX(-50%);
-  border-radius: 999px 999px 0 0;
-  background: var(--ink);
+@media (max-width: 760px) { .gacha-machine { width: 240px; } }
+.gacha-globe { position: relative; z-index: 1; width: 100%; aspect-ratio: 1; }
+.gacha-canvas { display: block; width: 100%; height: 100%; }
+.gacha-collar {
+  position: relative; z-index: 3; width: 44%; height: 16px; margin-top: -8px;
+  background: #566c86; box-shadow: 0 -4px 0 #1a1c2c, 4px 0 0 #1a1c2c, -4px 0 0 #1a1c2c;
 }
-.gacha-glass, .gacha-collar, .gacha-floor, .cap-core, .fly-core { display: none; }
 .gacha-body {
-  position: relative;
-  width: 64%;
-  aspect-ratio: 1.25;
-  margin-top: -14px;
-  background: var(--ink);
-  border-radius: 14px 14px 6px 6px;
+  position: relative; width: 66%; aspect-ratio: 1.2; background: #b13e53;
+  box-shadow: inset -8px -8px 0 #7a2941, inset 8px 8px 0 #ef7d57,
+    0 -4px 0 #1a1c2c, 0 4px 0 #1a1c2c, -4px 0 0 #1a1c2c, 4px 0 0 #1a1c2c;
 }
+/* The knob sits on the left so the teacher can reach it from the ledge. */
 .gacha-knob {
-  position: absolute;
-  top: 24%;
-  left: 50%;
-  width: 30%;
-  aspect-ratio: 1;
-  margin-left: -15%;
-  border-radius: 50%;
-  background: var(--globe);
+  position: absolute; top: 20%; left: 12%; width: 30%; aspect-ratio: 1; background: #f4f4f4;
+  box-shadow: inset -4px -4px 0 #94b0c2, 0 -4px 0 #1a1c2c, 0 4px 0 #1a1c2c, -4px 0 0 #1a1c2c, 4px 0 0 #1a1c2c;
 }
-.gacha-knob::after {
-  content: "";
-  position: absolute;
-  top: 44%;
-  left: 12%;
-  width: 76%;
-  height: 12%;
-  border-radius: 99px;
-  background: var(--ink);
-}
+.gacha-knob::after { content: ""; position: absolute; top: 42%; left: 12%; width: 76%; height: 16%; background: #1a1c2c; }
 .gacha-chute {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 34%;
-  height: 32%;
-  margin-left: -17%;
-  border-radius: 999px 999px 0 0;
-  background: var(--bg);
+  position: absolute; bottom: 0; left: 50%; width: 34%; height: 34%; margin-left: -17%; background: #000;
+  clip-path: polygon(0 100%, 0 30%, 12% 30%, 12% 12%, 30% 12%, 30% 0, 70% 0, 70% 12%, 88% 12%, 88% 30%, 100% 30%, 100% 100%);
 }
+.gacha-floor { align-self: stretch; height: 8px; margin: 4px 0 0 -110px; background: #0b0c18; }
 .gacha-count { margin: 12px 0 0; font-size: 1.2rem; color: var(--muted); }
+.gacha-ledge {
+  position: absolute; z-index: 2; height: 12px; background: #566c86;
+  box-shadow: inset 0 4px 0 #94b0c2, 0 4px 0 #1a1c2c, 0 -4px 0 #1a1c2c, -4px 0 0 #1a1c2c, 4px 0 0 #1a1c2c;
+}
+.gacha-ladder {
+  position: absolute; z-index: 2; width: 28px;
+  border-left: 4px solid #94b0c2; border-right: 4px solid #94b0c2;
+  background: repeating-linear-gradient(to bottom, transparent 0 12px, #94b0c2 12px 16px);
+}
+.teacher { position: absolute; top: 0; left: 0; z-index: 4; pointer-events: none; }
+.teacher canvas { display: block; image-rendering: pixelated; }
+.teacher-bubble {
+  position: absolute; top: -40px; left: 50%; transform: translateX(-50%);
+  padding: 0 10px; font-size: 1.5rem; background: #f4f4f4; color: #1a1c2c;
+  box-shadow: 0 -4px 0 #1a1c2c, 0 4px 0 #1a1c2c, -4px 0 0 #1a1c2c, 4px 0 0 #1a1c2c;
+}
+
 .gacha-reveal { position: relative; min-height: 320px; width: 100%; display: grid; place-items: center; }
 .reveal-hint { color: var(--muted); font-size: 1.4rem; margin: 0; }
-.capsule, .fly-ball { --cap: #999; }
-.capsule { position: absolute; top: 50%; left: 50%; width: 150px; height: 150px; margin: -75px 0 0 -75px; }
-.cap-top, .cap-bottom { position: absolute; left: 0; width: 100%; height: calc(50% - 2px); }
-.cap-top { top: 0; border-radius: 75px 75px 0 0; background: color-mix(in srgb, var(--cap) 55%, white); }
-.cap-bottom { bottom: 0; border-radius: 0 0 75px 75px; background: var(--cap); }
+.capsule { position: absolute; top: 50%; left: 50%; width: 128px; height: 128px; margin: -64px 0 0 -64px; }
+.cap-top, .cap-bottom {
+  position: absolute; left: 0; width: 100%; height: 50%;
+  background: var(--sprite) no-repeat; background-size: 100% 200%; image-rendering: pixelated;
+}
+.cap-top { top: 0; background-position: top; }
+.cap-bottom { bottom: 0; background-position: bottom; }
 .fly-ball {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 5;
-  border-radius: 50%;
-  pointer-events: none;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--cap) 55%, white) 50%, var(--cap) 50%);
+  position: absolute; top: 0; left: 0; z-index: 5; pointer-events: none;
+  background: var(--sprite) center / 100% 100% no-repeat; image-rendering: pixelated;
 }
 .reveal-card {
-  position: relative;
-  min-width: 70%;
-  padding: 24px 36px;
-  border: 3px solid var(--ink);
-  border-radius: 20px;
-  background: var(--panel);
+  position: relative; min-width: 70%; padding: 20px 32px; background: #f4f4f4; color: #1a1c2c;
+  box-shadow: 0 -6px 0 #1a1c2c, 0 6px 0 #1a1c2c, -6px 0 0 #1a1c2c, 6px 0 0 #1a1c2c,
+    inset -6px -6px 0 #94b0c2, 10px 10px 0 #0b0c18;
 }
-.reveal-label { font-size: clamp(2.8rem, 7vw, 6rem); font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; }
-.reveal-detail { margin-top: 8px; font-size: 1.5rem; color: var(--muted); white-space: pre-line; }
-.opened { list-style: none; padding: 0; margin: 16px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; min-height: 2.2em; }
-.opened li { display: inline-flex; align-items: center; gap: 8px; padding: 4px 14px 4px 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); font-size: 1.2rem; }
-.opened .dot { width: 18px; height: 18px; border-radius: 50%; }
+.reveal-label { font-size: clamp(2.6rem, 6.5vw, 5.5rem); line-height: 1.15; overflow-wrap: anywhere; }
+.reveal-detail { margin-top: 8px; font-size: 1.4rem; color: #333c57; white-space: pre-line; }
+.opened { list-style: none; padding: 0; margin: 20px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; min-height: 2.2em; }
+.opened li {
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 6px; background: var(--panel); font-size: 1.2rem;
+  box-shadow: 0 -4px 0 #1a1c2c, 0 4px 0 #1a1c2c, -4px 0 0 #1a1c2c, 4px 0 0 #1a1c2c;
+}
+.opened .dot { width: 16px; height: 16px; box-shadow: inset -4px -4px 0 rgba(0, 0, 0, .3); }
 .shortfall { background: var(--warn-bg); color: var(--warn-text); padding: 8px; border-radius: 8px; font-size: 1.3rem; }
 .actions { display: flex; gap: 16px; justify-content: center; margin-top: 16px; }
 .draw-side { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
@@ -208,3 +190,30 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .chips li { border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; }
 table.summary { width: 100%; border-collapse: collapse; font-size: 1.4rem; background: var(--panel); }
 table.summary th, table.summary td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; }
+
+/* Draw and summary screens: dark, pixel-font stage for projection. The setup screen keeps the
+   light form styles. */
+body[data-screen="draw"], body[data-screen="summary"] {
+  --bg: #141627;
+  --panel: #1f2240;
+  --text: #f4f4f4;
+  --muted: #94b0c2;
+  --border: #333c57;
+  --accent: #ef7d57;
+  --accent-text: #1a1c2c;
+  --warn-bg: #5a4a1a;
+  --warn-text: #ffe28a;
+  font-family: "DotGothic16", "Microsoft JhengHei", monospace;
+}
+body[data-screen="draw"] button, body[data-screen="summary"] button {
+  border: none;
+  border-radius: 0;
+  box-shadow: 0 -4px 0 #0b0c18, 0 4px 0 #0b0c18, -4px 0 0 #0b0c18, 4px 0 0 #0b0c18, inset -4px -4px 0 rgba(0, 0, 0, .25);
+}
+body[data-screen="draw"] .draw-side, body[data-screen="summary"] table.summary {
+  border: none;
+  border-radius: 0;
+  box-shadow: 0 -4px 0 #0b0c18, 0 4px 0 #0b0c18, -4px 0 0 #0b0c18, 4px 0 0 #0b0c18;
+}
+body[data-screen="draw"] .chips li { border-radius: 0; }
+body[data-screen="draw"] .shortfall { border-radius: 0; }
