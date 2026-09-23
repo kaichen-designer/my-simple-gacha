@@ -19,9 +19,10 @@
         id: 'g' + g.number,
         label: P.groupLabel(g.number),
         detail: g.members.join('、'),
+        group: g.number,
       }));
     }
-    return students.map((s, i) => ({ id: 'p' + i, label: s.name, detail: P.groupLabel(s.group) }));
+    return students.map((s, i) => ({ id: 'p' + i, label: s.name, detail: P.groupLabel(s.group), group: s.group }));
   }
 
   function validateSetup(mode, pool, tasks) {
@@ -37,43 +38,60 @@
     return { errors, warnings };
   }
 
+  // One result per task, filled one ball at a time. shortfall is finalised by nextTask.
   function createSession(tasks, pool) {
-    return { tasks: tasks.slice(), remaining: pool.slice(), results: [], index: 0 };
+    return {
+      tasks: tasks.slice(),
+      remaining: pool.slice(),
+      results: tasks.map(task => ({ task, winners: [], shortfall: 0 })),
+      index: 0,
+    };
   }
 
   function currentTask(s) {
     return s.index < s.tasks.length ? s.tasks[s.index] : null;
   }
 
-  function hasDrawnCurrent(s) {
-    return s.results.length > s.index;
+  function currentResult(s) {
+    return s.index < s.results.length ? s.results[s.index] : null;
   }
 
   function isFinished(s) {
     return s.index >= s.tasks.length;
   }
 
-  function drawCurrent(s, rng = Math.random) {
-    const task = currentTask(s);
-    if (!task) throw new Error('所有任務都抽完了');
-    if (hasDrawnCurrent(s)) throw new Error('這個任務已經抽過了');
-    const winners = pickRandom(s.remaining, task.count, rng);
-    const ids = new Set(winners.map(w => w.id));
-    return {
-      ...s,
-      remaining: s.remaining.filter(p => !ids.has(p.id)),
-      results: [...s.results, { task, winners, shortfall: task.count - winners.length }],
-    };
+  // How many more the current task asks for (0 when full or finished).
+  function needed(s) {
+    const r = currentResult(s);
+    return r ? r.task.count - r.winners.length : 0;
+  }
+
+  function isCurrentComplete(s) {
+    return needed(s) === 0 || s.remaining.length === 0;
+  }
+
+  function withCurrentResult(s, result) {
+    return { ...s, results: s.results.map((r, i) => (i === s.index ? result : r)) };
+  }
+
+  function drawOne(s, rng = Math.random) {
+    const r = currentResult(s);
+    if (!r) throw new Error('所有任務都抽完了');
+    if (isCurrentComplete(s)) throw new Error('這個任務已經抽滿了');
+    const [winner] = pickRandom(s.remaining, 1, rng);
+    const next = withCurrentResult(s, { ...r, winners: [...r.winners, winner] });
+    return { ...next, remaining: s.remaining.filter(p => p.id !== winner.id) };
   }
 
   function nextTask(s) {
-    if (!hasDrawnCurrent(s)) throw new Error('請先抽這個任務');
-    return { ...s, index: s.index + 1 };
+    if (!isCurrentComplete(s)) throw new Error('請先抽完這個任務');
+    const r = currentResult(s);
+    return { ...withCurrentResult(s, { ...r, shortfall: needed(s) }), index: s.index + 1 };
   }
 
   const api = {
-    pickRandom, buildPool, validateSetup, createSession,
-    currentTask, hasDrawnCurrent, isFinished, drawCurrent, nextTask,
+    pickRandom, buildPool, validateSetup, createSession, currentTask, currentResult,
+    isFinished, needed, isCurrentComplete, drawOne, nextTask,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.DrawLots = Object.assign(root.DrawLots || {}, api);

@@ -164,26 +164,36 @@
 
   function renderSide() {
     const s = state.session;
-    $('results').replaceChildren(...s.results.map(r => el('li', `${r.task.name}：${winnersText(r.winners)}`)));
+    const drawn = s.results.filter(r => r.winners.length);
+    $('results').replaceChildren(...drawn.map(r => el('li', `${r.task.name}：${winnersText(r.winners)}`)));
     $('remaining-count').textContent = String(s.remaining.length);
     $('remaining').replaceChildren(...s.remaining.map(p => el('li', p.label)));
+  }
+
+  function openedChip(item) {
+    const li = el('li');
+    const dot = el('span', undefined, 'dot');
+    dot.style.background = D.ballColor(item.group);
+    li.append(dot, item.label);
+    return li;
   }
 
   function renderDraw() {
     const s = state.session;
     const task = D.currentTask(s);
-    const drawn = D.hasDrawnCurrent(s);
-    const result = drawn ? s.results[s.index] : null;
+    const result = D.currentResult(s);
+    const complete = D.isCurrentComplete(s);
+    const left = D.needed(s);
     $('progress').textContent = `任務 ${s.index + 1} / ${s.tasks.length}`;
     $('task-title').textContent = task.name;
     $('task-count').textContent = `抽 ${task.count} ${unit()}`;
-    $('stage').textContent = result ? winnersText(result.winners) : '?';
-    $('stage-detail').textContent = result ? winnersDetail(result.winners) : '';
-    const short = result !== null && result.shortfall > 0;
+    $('opened').replaceChildren(...result.winners.map(openedChip));
+    const short = complete && left > 0;
     $('shortfall').hidden = !short;
-    if (short) $('shortfall').textContent = `剩下的不夠，少了 ${result.shortfall} ${unit()}`;
-    $('draw').hidden = drawn;
-    $('next').hidden = !drawn;
+    if (short) $('shortfall').textContent = `剩下的不夠，少了 ${left} ${unit()}`;
+    $('draw').hidden = complete;
+    $('draw').textContent = left < task.count ? `再抽！（還要 ${left} ${unit()}）` : '抽！';
+    $('next').hidden = !complete;
     $('next').textContent = s.index === s.tasks.length - 1 ? '看結果' : '下一個任務';
     renderSide();
   }
@@ -206,6 +216,7 @@
   function startSession() {
     state.session = D.createSession(state.tasks, state.pool);
     showScreen('draw');
+    state.machine.setBalls(state.pool);
     renderDraw();
   }
 
@@ -213,23 +224,24 @@
     if (state.busy) return;
     state.busy = true;
     $('draw').disabled = true;
-    const candidates = state.session.remaining.map(p => p.label);
-    state.session = D.drawCurrent(state.session);
-    const result = state.session.results[state.session.index];
-    $('stage-detail').textContent = '';
-    $('shortfall').hidden = true;
-    await D.play($('stage'), candidates, winnersText(result.winners));
+    $('next').disabled = true;
+    state.session = D.drawOne(state.session);
+    const winners = D.currentResult(state.session).winners;
+    await state.machine.dispense(winners[winners.length - 1]);
     state.busy = false;
     $('draw').disabled = false;
+    $('next').disabled = false;
     renderDraw();
   }
 
   function onNext() {
+    if (state.busy) return;
     state.session = D.nextTask(state.session);
     if (D.isFinished(state.session)) {
       renderSummary();
       showScreen('summary');
     } else {
+      state.machine.showHint();
       renderDraw();
     }
   }
@@ -251,5 +263,6 @@
   $('next').addEventListener('click', onNext);
   $('redraw').addEventListener('click', startSession);
   $('back').addEventListener('click', () => showScreen('setup'));
+  state.machine = D.createMachine($('gacha'));
   refreshSetup();
 })();
