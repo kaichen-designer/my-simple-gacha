@@ -1,0 +1,7 @@
+{
+  "name": "draw-lots",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  }
+}
