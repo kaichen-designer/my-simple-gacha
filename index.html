@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>任務抽籤</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <section id="setup-screen" class="screen">
+      <h1>任務抽籤</h1>
+      <fieldset class="mode">
+        <legend>抽籤方式</legend>
+        <label><input type="radio" name="mode" value="group" checked> 抽組</label>
+        <label><input type="radio" name="mode" value="person"> 抽個人</label>
+      </fieldset>
+      <div class="setup-grid">
+        <div class="field">
+          <label for="roster">名單（直接貼上 LINE 留言，一行一位）</label>
+          <textarea id="roster" rows="14" placeholder="第1組 王小明&#10;李大華 1組&#10;3 陳美美"></textarea>
+          <div id="preview" class="preview" aria-live="polite"></div>
+        </div>
+        <div class="field">
+          <label for="tasks">任務（一行一個，後面可加數量，例如「打掃 2」）</label>
+          <textarea id="tasks" rows="8" placeholder="擦黑板&#10;打掃 2&#10;倒垃圾"></textarea>
+        </div>
+      </div>
+      <ul id="messages" class="messages"></ul>
+      <button id="start" type="button" class="primary" disabled>開始抽籤</button>
+    </section>
+
+    <section id="draw-screen" class="screen" hidden>
+      <div class="draw-layout">
+        <div class="draw-main">
+          <p id="progress" class="progress"></p>
+          <h2 id="task-title" class="task-title"></h2>
+          <p id="task-count" class="task-count"></p>
+          <div id="stage" class="stage">?</div>
+          <p id="stage-detail" class="stage-detail"></p>
+          <p id="shortfall" class="shortfall" hidden></p>
+          <div class="actions">
+            <button id="draw" type="button" class="primary">抽！</button>
+            <button id="next" type="button" class="primary" hidden>下一個任務</button>
+          </div>
+        </div>
+        <aside class="draw-side">
+          <h3>已分配</h3>
+          <ol id="results" class="results"></ol>
+          <h3>尚未抽到（<span id="remaining-count">0</span>）</h3>
+          <ul id="remaining" class="chips"></ul>
+        </aside>
+      </div>
+    </section>
+
+    <section id="summary-screen" class="screen" hidden>
+      <h2>分配結果</h2>
+      <table class="summary">
+        <thead><tr><th>任務</th><th>抽中</th><th>說明</th></tr></thead>
+        <tbody id="summary-body"></tbody>
+      </table>
+      <div class="actions">
+        <button id="redraw" type="button" class="primary">重新抽</button>
+        <button id="back" type="button">回到設定</button>
+      </div>
+    </section>
+  </main>
+  <script src="src/parse.js"></script>
+  <script src="src/draw.js"></script>
+  <script src="src/animation.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>
