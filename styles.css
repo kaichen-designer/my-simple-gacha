@@ -117,12 +117,23 @@ button {
 button:active:not(:disabled) { transform: translate(2px, 2px); }
 button.primary { background: var(--accent); color: var(--accent-text); }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
-/* PRESS START */
-#start { font-size: 1.8rem; padding: 14px 44px; }
-#start .arrow { display: inline-block; animation: arrow-blink 1s steps(1) infinite; }
-#start:disabled .arrow { animation: none; }
+/* PRESS START, plus continue / restart / clear once a draw is under way. */
+.start-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; }
+#start, #resume { font-size: 1.8rem; padding: 14px 44px; }
+.start-actions .arrow { display: inline-block; animation: arrow-blink 1s steps(1) infinite; }
+.start-actions button:disabled .arrow { animation: none; }
 @keyframes arrow-blink { 50% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { #start .arrow { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .start-actions .arrow { animation: none; } }
+button.danger { background: #b13e53; color: var(--text); }
+.resume-note { margin: 0 0 16px; color: var(--gold); }
+.to-setup { position: absolute; top: 0; left: 0; font-size: 1rem; padding: 6px 12px; }
+.pixel-dialog {
+  border: none; padding: 24px 28px; max-width: 420px; background: var(--panel); color: var(--text); font: inherit;
+  box-shadow: var(--px), 8px 8px 0 var(--ink);
+}
+.pixel-dialog p { margin: 0 0 20px; font-size: 1.2rem; line-height: 1.6; }
+.pixel-dialog .actions { justify-content: flex-end; }
+.pixel-dialog::backdrop { background: rgba(11, 12, 24, .75); }
 .draw-layout { display: grid; grid-template-columns: 1fr 300px; gap: 32px; }
 @media (max-width: 900px) { .draw-layout { grid-template-columns: 1fr; } }
 .draw-main { text-align: center; }

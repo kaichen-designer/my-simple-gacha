@@ -22,7 +22,8 @@
         group: g.number,
       }));
     }
-    return students.map((s, i) => ({ id: 'p' + i, label: s.name, detail: P.groupLabel(s.group), group: s.group }));
+    // Names are unique after parsing, so they identify a person across roster edits.
+    return students.map(s => ({ id: 'p:' + s.name, label: s.name, detail: P.groupLabel(s.group), group: s.group }));
   }
 
   function validateSetup(mode, pool, tasks) {
@@ -89,7 +90,37 @@
     return { ...withCurrentResult(s, { ...r, shortfall: needed(s) }), index: s.index + 1 };
   }
 
+  // Applies edited tasks and pool to a session in progress: assignments carry over by task name
+  // (in order, up to the new count) as long as the winner is still in the pool; everyone else
+  // is back in the pool; drawing resumes at the first task that still needs someone.
+  function reconcileSession(old, tasks, pool) {
+    const byId = new Map(pool.map(p => [p.id, p]));
+    const previous = old.results.map(r => ({ name: r.task.name, winners: r.winners }));
+    const taken = new Set();
+    const results = tasks.map(task => {
+      const i = previous.findIndex(p => p && p.name === task.name);
+      let winners = [];
+      if (i >= 0) {
+        winners = previous[i].winners
+          .filter(w => byId.has(w.id) && !taken.has(w.id))
+          .slice(0, task.count)
+          .map(w => byId.get(w.id));
+        previous[i] = null;
+      }
+      winners.forEach(w => taken.add(w.id));
+      return { task, winners, shortfall: 0 };
+    });
+    const index = results.findIndex(r => r.winners.length < r.task.count);
+    return {
+      tasks: tasks.slice(),
+      remaining: pool.filter(p => !taken.has(p.id)),
+      results,
+      index: index < 0 ? tasks.length : index,
+    };
+  }
+
   const api = {
+    reconcileSession,
     pickRandom, buildPool, validateSetup, createSession, currentTask, currentResult,
     isFinished, needed, isCurrentComplete, drawOne, nextTask,
   };

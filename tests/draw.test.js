@@ -27,10 +27,10 @@ test('buildPool group mode lists groups with members', () => {
 
 test('buildPool person mode lists everyone with their group', () => {
   assert.deepEqual(D.buildPool('person', students), [
-    { id: 'p0', label: '王小明', detail: '第1組', group: 1 },
-    { id: 'p1', label: '李大華', detail: '第1組', group: 1 },
-    { id: 'p2', label: '陳美美', detail: '第2組', group: 2 },
-    { id: 'p3', label: '自由人', detail: '未分組', group: null },
+    { id: 'p:王小明', label: '王小明', detail: '第1組', group: 1 },
+    { id: 'p:李大華', label: '李大華', detail: '第1組', group: 1 },
+    { id: 'p:陳美美', label: '陳美美', detail: '第2組', group: 2 },
+    { id: 'p:自由人', label: '自由人', detail: '未分組', group: null },
   ]);
 });
 
@@ -102,4 +102,67 @@ test('drawOne does not mutate the previous session', () => {
   D.drawOne(s0, zero);
   assert.equal(s0.remaining.length, 2);
   assert.deepEqual(s0.results[0].winners, []);
+});
+
+// A session that drew g1 for 擦黑板 and g2 for 打掃 (count 2, one still to go).
+function midSession() {
+  const pool = D.buildPool('group', [
+    { name: 'A', group: 1 }, { name: 'B', group: 2 }, { name: 'C', group: 3 }, { name: 'D', group: 4 },
+  ]);
+  let s = D.createSession([{ name: '擦黑板', count: 1 }, { name: '打掃', count: 2 }, { name: '倒垃圾', count: 1 }], pool);
+  s = D.drawOne(s, zero); // g1
+  s = D.nextTask(s);
+  s = D.drawOne(s, zero); // g2
+  return s;
+}
+const groups = (...numbers) => D.buildPool('group', numbers.map((n, i) => ({ name: 'S' + i, group: n })));
+const labels = r => r.winners.map(w => w.label);
+
+test('reconcileSession keeps assignments and resumes at the first unfilled task', () => {
+  const s = D.reconcileSession(midSession(), [{ name: '擦黑板', count: 1 }, { name: '打掃', count: 2 }, { name: '倒垃圾', count: 1 }], groups(1, 2, 3, 4));
+  assert.deepEqual(s.results.map(labels), [['第1組'], ['第2組'], []]);
+  assert.deepEqual(s.remaining.map(p => p.label), ['第3組', '第4組']);
+  assert.equal(s.index, 1);
+  assert.equal(D.needed(s), 1);
+});
+
+test('reconcileSession adds new groups to the pool and drops removed ones with their assignments', () => {
+  const s = D.reconcileSession(midSession(), [{ name: '擦黑板', count: 1 }, { name: '打掃', count: 2 }], groups(2, 3, 5));
+  assert.deepEqual(s.results.map(labels), [[], ['第2組']]);
+  assert.deepEqual(s.remaining.map(p => p.label), ['第3組', '第5組']);
+  assert.equal(s.index, 0);
+});
+
+test('reconcileSession matches tasks by name, trims lowered counts and handles new tasks', () => {
+  const s = D.reconcileSession(midSession(), [{ name: '新任務', count: 1 }, { name: '擦黑板', count: 1 }, { name: '打掃', count: 1 }], groups(1, 2, 3, 4));
+  assert.deepEqual(s.results.map(labels), [[], ['第1組'], ['第2組']]);
+  assert.equal(s.index, 0);
+  assert.equal(s.remaining.length, 2);
+});
+
+test('reconcileSession uses the fresh pool entries so edited members show up', () => {
+  const pool = D.buildPool('group', [{ name: 'A', group: 1 }, { name: 'Z', group: 1 }, { name: 'B', group: 2 }]);
+  const s = D.reconcileSession(midSession(), [{ name: '擦黑板', count: 1 }], pool);
+  assert.equal(s.results[0].winners[0].detail, 'A、Z');
+});
+
+test('reconcileSession reopens a short task once the pool grows, and finishes when all are full', () => {
+  const pool = groups(1);
+  let s = D.createSession([{ name: '打掃', count: 2 }], pool);
+  s = D.drawOne(s, zero);
+  assert.equal(D.isCurrentComplete(s), true); // pool ran out
+  s = D.reconcileSession(s, [{ name: '打掃', count: 2 }], groups(1, 2));
+  assert.equal(s.index, 0);
+  assert.equal(D.isCurrentComplete(s), false);
+  const done = D.reconcileSession(D.drawOne(s, zero), [{ name: '打掃', count: 2 }], groups(1, 2));
+  assert.equal(D.isFinished(done), true);
+});
+
+test('reconcileSession keeps only as many winners as the lowered count and frees the rest', () => {
+  let s = D.createSession([{ name: '打掃', count: 2 }], groups(1, 2, 3));
+  s = D.drawOne(D.drawOne(s, zero), zero); // g1, g2
+  s = D.reconcileSession(s, [{ name: '打掃', count: 1 }], groups(1, 2, 3));
+  assert.deepEqual(s.results.map(labels), [['第1組']]);
+  assert.deepEqual(s.remaining.map(p => p.label), ['第2組', '第3組']);
+  assert.equal(D.isFinished(s), true);
 });

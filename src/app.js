@@ -3,7 +3,7 @@
 
   const D = window.DrawLots;
   const $ = id => document.getElementById(id);
-  const state = { mode: 'group', pool: [], tasks: [], session: null, busy: false };
+  const state = { mode: 'group', pool: [], tasks: [], session: null, sessionMode: null, busy: false };
 
   function el(tag, text, className) {
     const e = document.createElement(tag);
@@ -156,6 +156,7 @@
     }
     $('messages').replaceChildren(...messages.map(m => el('li', m.text, m.cls)));
     $('start').disabled = errors.length > 0;
+    renderStartActions(errors.length > 0);
     Object.assign(state, { mode, pool, tasks });
   }
 
@@ -229,11 +230,83 @@
     $('summary-body').replaceChildren(...rows);
   }
 
+  // With a draw under way the setup screen offers continue / restart instead of start.
+  function renderStartActions(hasErrors) {
+    const ongoing = state.session !== null;
+    const sameMode = ongoing && state.sessionMode === currentMode();
+    $('start').hidden = ongoing;
+    $('resume').hidden = !ongoing;
+    $('restart').hidden = !ongoing;
+    $('resume').disabled = hasErrors || !sameMode;
+    $('restart').disabled = hasErrors;
+    $('resume-note').hidden = !ongoing;
+    if (!ongoing) return;
+    const done = state.session.results.filter(r => r.winners.length).length;
+    $('resume-note').textContent = sameMode
+      ? `進行中的抽籤：已指派 ${done} 項任務。修改後按「繼續抽籤」會保留已抽出的結果。`
+      : '已切換抽組／抽個人，只能「重新開始」。';
+  }
+
+  function showSession() {
+    if (D.isFinished(state.session)) {
+      renderSummary();
+      showScreen('summary');
+      return;
+    }
+    showScreen('draw');
+    state.machine.setBalls(state.session.remaining);
+    renderDraw();
+  }
+
   function startSession() {
     state.session = D.createSession(state.tasks, state.pool);
-    showScreen('draw');
-    state.machine.setBalls(state.pool);
-    renderDraw();
+    state.sessionMode = state.mode;
+    showSession();
+  }
+
+  function resumeSession() {
+    state.session = D.reconcileSession(state.session, state.tasks, state.pool);
+    showSession();
+  }
+
+  // A pixel-styled yes/no dialog. Resolves true on 確定.
+  function confirmPixel(message) {
+    const dialog = $('confirm');
+    $('confirm-text').textContent = message;
+    return new Promise(resolve => {
+      const finish = answer => {
+        $('confirm-yes').onclick = $('confirm-no').onclick = dialog.oncancel = null;
+        if (dialog.open) dialog.close();
+        resolve(answer);
+      };
+      $('confirm-yes').onclick = () => finish(true);
+      $('confirm-no').onclick = () => finish(false);
+      dialog.oncancel = e => { e.preventDefault(); finish(false); };
+      dialog.showModal();
+      $('confirm-no').focus();
+    });
+  }
+
+  async function restartSession() {
+    if (await confirmPixel('重新開始會清除目前已抽出的結果，確定嗎？')) startSession();
+  }
+
+  async function clearAll() {
+    if (!(await confirmPixel('要清除名單、任務和抽籤進度嗎？'))) return;
+    for (const bodyId of Object.keys(TABLES)) {
+      $(bodyId).replaceChildren();
+      addRow(bodyId);
+    }
+    $('paste-text').value = '';
+    $('paste-result').textContent = '';
+    state.session = null;
+    refreshSetup();
+  }
+
+  function goSetup() {
+    if (state.busy) return;
+    showScreen('setup');
+    refreshSetup();
   }
 
   async function onDraw() {
@@ -284,7 +357,16 @@
   $('draw').addEventListener('click', onDraw);
   $('next').addEventListener('click', onNext);
   $('redraw').addEventListener('click', startSession);
-  $('back').addEventListener('click', () => showScreen('setup'));
+  $('back').addEventListener('click', goSetup);
+  $('to-setup').addEventListener('click', goSetup);
+  $('resume').addEventListener('click', resumeSession);
+  $('restart').addEventListener('click', restartSession);
+  $('clear-all').addEventListener('click', clearAll);
+  // Esc on the draw or summary screen goes back to setup (once any animation has finished).
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || $('confirm').open) return;
+    if (document.body.dataset.screen === 'draw' || document.body.dataset.screen === 'summary') goSetup();
+  });
   $('mute').addEventListener('click', () => {
     state.sfx.setMuted(!state.sfx.muted);
     renderMute();

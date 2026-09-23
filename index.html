@@ -48,12 +48,19 @@
         </div>
       </div>
       <ul id="messages" class="messages"></ul>
-      <button id="start" type="button" class="primary" disabled><span class="arrow" aria-hidden="true">▶</span> 開始抽籤</button>
+      <p id="resume-note" class="resume-note" hidden></p>
+      <div class="start-actions">
+        <button id="start" type="button" class="primary" disabled><span class="arrow" aria-hidden="true">▶</span> 開始抽籤</button>
+        <button id="resume" type="button" class="primary" hidden><span class="arrow" aria-hidden="true">▶</span> 繼續抽籤</button>
+        <button id="restart" type="button" hidden>↻ 重新開始</button>
+        <button id="clear-all" type="button" class="danger">✖ 全部清除</button>
+      </div>
     </section>
 
     <section id="draw-screen" class="screen" hidden>
       <div class="draw-layout">
         <div class="draw-main">
+          <button id="to-setup" type="button" class="to-setup" title="回到設定（Esc）">◀ 設定</button>
           <button id="mute" type="button" class="mute" aria-pressed="false">🔊 音效</button>
           <p id="progress" class="progress"></p>
           <h2 id="task-title" class="task-title"></h2>
@@ -87,6 +94,13 @@
       </div>
     </section>
   </main>
+  <dialog id="confirm" class="pixel-dialog">
+    <p id="confirm-text"></p>
+    <div class="actions">
+      <button id="confirm-no" type="button">取消</button>
+      <button id="confirm-yes" type="button" class="primary">確定</button>
+    </div>
+  </dialog>
   <script src="src/parse.js"></script>
   <script src="src/draw.js"></script>
   <script src="src/sfx.js"></script>
