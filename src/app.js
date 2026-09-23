@@ -56,8 +56,103 @@
     Object.assign(state, { mode, pool, tasks });
   }
 
+  function showScreen(name) {
+    for (const id of ['setup-screen', 'draw-screen', 'summary-screen']) {
+      $(id).hidden = id !== name + '-screen';
+    }
+  }
+
+  function unit() {
+    return state.mode === 'group' ? '組' : '人';
+  }
+
+  function winnersText(winners) {
+    return winners.length ? winners.map(w => w.label).join('、') : '—';
+  }
+
+  function winnersDetail(winners) {
+    return winners.map(w => `${w.label}：${w.detail}`).join('\n');
+  }
+
+  function renderSide() {
+    const s = state.session;
+    $('results').replaceChildren(...s.results.map(r => el('li', `${r.task.name}：${winnersText(r.winners)}`)));
+    $('remaining-count').textContent = String(s.remaining.length);
+    $('remaining').replaceChildren(...s.remaining.map(p => el('li', p.label)));
+  }
+
+  function renderDraw() {
+    const s = state.session;
+    const task = D.currentTask(s);
+    const drawn = D.hasDrawnCurrent(s);
+    const result = drawn ? s.results[s.index] : null;
+    $('progress').textContent = `任務 ${s.index + 1} / ${s.tasks.length}`;
+    $('task-title').textContent = task.name;
+    $('task-count').textContent = `抽 ${task.count} ${unit()}`;
+    $('stage').textContent = result ? winnersText(result.winners) : '?';
+    $('stage-detail').textContent = result ? winnersDetail(result.winners) : '';
+    const short = result !== null && result.shortfall > 0;
+    $('shortfall').hidden = !short;
+    if (short) $('shortfall').textContent = `剩下的不夠，少了 ${result.shortfall} ${unit()}`;
+    $('draw').hidden = drawn;
+    $('next').hidden = !drawn;
+    $('next').textContent = s.index === s.tasks.length - 1 ? '看結果' : '下一個任務';
+    renderSide();
+  }
+
+  function renderSummary() {
+    const s = state.session;
+    const rows = s.results.map(r => {
+      const tr = el('tr');
+      tr.append(el('td', r.task.name), el('td', winnersText(r.winners)), el('td', winnersDetail(r.winners)));
+      return tr;
+    });
+    if (s.remaining.length) {
+      const tr = el('tr');
+      tr.append(el('td', '未抽到'), el('td', s.remaining.map(p => p.label).join('、')), el('td', ''));
+      rows.push(tr);
+    }
+    $('summary-body').replaceChildren(...rows);
+  }
+
+  function startSession() {
+    state.session = D.createSession(state.tasks, state.pool);
+    showScreen('draw');
+    renderDraw();
+  }
+
+  async function onDraw() {
+    if (state.busy) return;
+    state.busy = true;
+    $('draw').disabled = true;
+    const candidates = state.session.remaining.map(p => p.label);
+    state.session = D.drawCurrent(state.session);
+    const result = state.session.results[state.session.index];
+    $('stage-detail').textContent = '';
+    $('shortfall').hidden = true;
+    await D.play($('stage'), candidates, winnersText(result.winners));
+    state.busy = false;
+    $('draw').disabled = false;
+    renderDraw();
+  }
+
+  function onNext() {
+    state.session = D.nextTask(state.session);
+    if (D.isFinished(state.session)) {
+      renderSummary();
+      showScreen('summary');
+    } else {
+      renderDraw();
+    }
+  }
+
   $('roster').addEventListener('input', refreshSetup);
   $('tasks').addEventListener('input', refreshSetup);
   document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', refreshSetup));
+  $('start').addEventListener('click', startSession);
+  $('draw').addEventListener('click', onDraw);
+  $('next').addEventListener('click', onNext);
+  $('redraw').addEventListener('click', startSession);
+  $('back').addEventListener('click', () => showScreen('setup'));
   refreshSetup();
 })();
