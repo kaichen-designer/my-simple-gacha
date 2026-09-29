@@ -25,6 +25,12 @@
             <h2>名單</h2>
             <button id="paste-toggle" type="button" class="small" aria-expanded="false">從 LINE 貼上</button>
           </div>
+          <div class="saves">
+            <select id="roster-select" aria-label="已存的名單"></select>
+            <button id="roster-save" type="button" class="small">💾 存成…</button>
+            <button id="roster-delete" type="button" class="small" disabled>🗑 刪除</button>
+          </div>
+          <p id="roster-note" class="saves-note" aria-live="polite"></p>
           <div id="paste-panel" class="paste-panel" hidden>
             <label for="paste-text">把 LINE 記事本的留言整段貼在這裡，一行一位</label>
             <textarea id="paste-text" rows="6" placeholder="第1組 王小明&#10;李大華 1組&#10;3 陳美美"></textarea>
@@ -40,6 +46,12 @@
         </div>
         <div class="field">
           <div class="field-head"><h2>任務</h2></div>
+          <div class="saves">
+            <select id="tasks-select" aria-label="已存的任務"></select>
+            <button id="tasks-save" type="button" class="small">💾 存成…</button>
+            <button id="tasks-delete" type="button" class="small" disabled>🗑 刪除</button>
+          </div>
+          <p id="tasks-note" class="saves-note" aria-live="polite"></p>
           <table class="grid">
             <thead><tr><th>任務</th><th class="num">數量</th><th class="del"><span class="sr-only">刪除</span></th></tr></thead>
             <tbody id="tasks-body"></tbody>
@@ -101,8 +113,17 @@
       <button id="confirm-yes" type="button" class="primary">確定</button>
     </div>
   </dialog>
+  <dialog id="name-dialog" class="pixel-dialog">
+    <label id="name-text" for="name-input"></label>
+    <input id="name-input" type="text" maxlength="30" autocomplete="off">
+    <div class="actions">
+      <button id="name-no" type="button">取消</button>
+      <button id="name-yes" type="button" class="primary">存檔</button>
+    </div>
+  </dialog>
   <script src="src/parse.js"></script>
   <script src="src/draw.js"></script>
+  <script src="src/store.js"></script>
   <script src="src/sfx.js"></script>
   <script src="src/gacha.js"></script>
   <script src="src/teacher.js"></script>

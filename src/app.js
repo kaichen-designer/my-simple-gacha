@@ -75,6 +75,99 @@
     }));
   }
 
+  // Replaces a table's rows, keeping one blank row when there is nothing to show.
+  function setRows(bodyId, rows) {
+    const cfg = TABLES[bodyId];
+    $(bodyId).replaceChildren();
+    for (const row of rows) addRow(bodyId, row.name, row[cfg.numKey] ?? '');
+    if ($(bodyId).rows.length === 0) addRow(bodyId);
+  }
+
+  function hasContent(rows) {
+    return rows.some(r => Object.values(r).some(v => v.trim() !== ''));
+  }
+
+  // Each saved-list kind maps to the table it fills and the noun used in messages.
+  const SAVES = {
+    roster: { bodyId: 'roster-body', noun: '名單' },
+    tasks: { bodyId: 'tasks-body', noun: '任務' },
+  };
+
+  function refreshSaves(kind, selected = '') {
+    const names = state.store.listSaves(kind);
+    const select = $(kind + '-select');
+    const placeholder = el('option', names.length ? `— 載入已存的${SAVES[kind].noun} —` : `（還沒有存過${SAVES[kind].noun}）`);
+    placeholder.value = '';
+    select.replaceChildren(placeholder, ...names.map(name => {
+      const o = el('option', name);
+      o.value = name;
+      return o;
+    }));
+    select.value = names.includes(selected) ? selected : '';
+    select.disabled = names.length === 0;
+    $(kind + '-delete').disabled = select.value === '';
+  }
+
+  function saveNote(kind, text) {
+    $(kind + '-note').textContent = text;
+  }
+
+  async function onSaveAs(kind) {
+    const { bodyId, noun } = SAVES[kind];
+    const rows = readRows(bodyId);
+    if (!hasContent(rows)) return saveNote(kind, `${noun}是空的，先填一些再存`);
+    const name = await promptPixel(`把目前的${noun}存成：`, $(kind + '-select').value);
+    if (name === null) return;
+    if (!name) return saveNote(kind, '請輸入名稱');
+    if (state.store.hasSave(kind, name) && !(await confirmPixel(`「${name}」已經存在，要覆蓋嗎？`))) return;
+    if (state.store.putSave(kind, name, rows)) {
+      refreshSaves(kind, name);
+      saveNote(kind, `已存成「${name}」`);
+    } else {
+      saveNote(kind, '這個瀏覽器無法儲存（可能是無痕模式或已停用）');
+    }
+  }
+
+  async function onLoadSave(kind) {
+    const select = $(kind + '-select');
+    const name = select.value;
+    $(kind + '-delete').disabled = name === '';
+    if (name === '') return;
+    const { bodyId, noun } = SAVES[kind];
+    const rows = state.store.getSave(kind, name);
+    if (!rows) return refreshSaves(kind);
+    if (hasContent(readRows(bodyId)) && !(await confirmPixel(`要用「${name}」取代目前的${noun}嗎？`))) {
+      select.value = '';
+      $(kind + '-delete').disabled = true;
+      return;
+    }
+    setRows(bodyId, rows);
+    saveNote(kind, `已載入「${name}」`);
+    refreshSetup();
+  }
+
+  async function onDeleteSave(kind) {
+    const name = $(kind + '-select').value;
+    if (!name || !(await confirmPixel(`要刪除已存的「${name}」嗎？`))) return;
+    state.store.removeSave(kind, name);
+    refreshSaves(kind);
+    saveNote(kind, `已刪除「${name}」`);
+  }
+
+  // What is on screen is remembered automatically and restored on the next visit.
+  function saveDraft() {
+    const draft = { roster: readRows('roster-body'), tasks: readRows('tasks-body') };
+    if (hasContent(draft.roster) || hasContent(draft.tasks)) state.store.saveDraft(draft);
+    else state.store.clearDraft();
+  }
+
+  function restoreDraft() {
+    const draft = state.store.loadDraft();
+    if (!draft) return;
+    setRows('roster-body', draft.roster);
+    setRows('tasks-body', draft.tasks);
+  }
+
   function onTableClick(e) {
     const del = e.target.closest('.row-del');
     if (!del) return;
@@ -158,6 +251,7 @@
     $('start').disabled = errors.length > 0;
     renderStartActions(errors.length > 0);
     Object.assign(state, { mode, pool, tasks });
+    saveDraft();
   }
 
   function showScreen(name) {
@@ -287,6 +381,28 @@
     });
   }
 
+  // A pixel-styled text prompt. Resolves the trimmed text on 存檔 (possibly empty), or null on cancel.
+  function promptPixel(message, initial = '') {
+    const dialog = $('name-dialog');
+    const field = $('name-input');
+    $('name-text').textContent = message;
+    field.value = initial;
+    return new Promise(resolve => {
+      const finish = answer => {
+        $('name-yes').onclick = $('name-no').onclick = field.onkeydown = dialog.oncancel = null;
+        if (dialog.open) dialog.close();
+        resolve(answer);
+      };
+      $('name-yes').onclick = () => finish(field.value.trim());
+      $('name-no').onclick = () => finish(null);
+      field.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); finish(field.value.trim()); } };
+      dialog.oncancel = e => { e.preventDefault(); finish(null); };
+      dialog.showModal();
+      field.focus();
+      field.select();
+    });
+  }
+
   async function restartSession() {
     if (await confirmPixel('重新開始會清除目前已抽出的結果，確定嗎？')) startSession();
   }
@@ -350,6 +466,11 @@
   }
   $('roster-add').addEventListener('click', () => { addRow('roster-body').querySelector('.c-name').focus(); });
   $('tasks-add').addEventListener('click', () => { addRow('tasks-body').querySelector('.c-name').focus(); });
+  for (const kind of Object.keys(SAVES)) {
+    $(kind + '-select').addEventListener('change', () => onLoadSave(kind));
+    $(kind + '-save').addEventListener('click', () => onSaveAs(kind));
+    $(kind + '-delete').addEventListener('click', () => onDeleteSave(kind));
+  }
   $('paste-toggle').addEventListener('click', togglePaste);
   $('paste-apply').addEventListener('click', onPasteApply);
   document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', refreshSetup));
@@ -385,6 +506,9 @@
   }
 
   setupTeacher();
+  try { state.store = D.createStore(window.localStorage); } catch { state.store = D.createStore(null); }
+  restoreDraft();
+  for (const kind of Object.keys(SAVES)) refreshSaves(kind);
   state.sfx = D.createSfx();
   state.machine = D.createMachine($('gacha'), { sfx: state.sfx });
   state.machine.setActor(D.createTeacher($('gacha'), { sfx: state.sfx }));

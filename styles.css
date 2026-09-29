@@ -53,6 +53,19 @@ fieldset.mode label:has(input:focus-visible) { outline: 4px dashed var(--gold); 
 .field-head h2 { font-size: 1.5rem; font-weight: normal; margin: 0; color: var(--gold); }
 .field-head h2::before { content: "▸ "; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Saved lists: a dropdown to load one, plus save-as and delete. */
+.saves { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+.saves select {
+  flex: 1 1 100%; min-width: 0; font: inherit; font-size: 1rem; padding: 6px 8px; border: none; border-radius: 0;
+  background: var(--field); color: var(--text); box-shadow: inset 4px 4px 0 var(--ink);
+}
+.saves select:disabled { opacity: 0.45; }
+.saves-note { min-height: 1.4em; margin: 0 0 8px; color: var(--muted); font-size: 0.95rem; }
+.pixel-dialog label { display: block; margin-bottom: 12px; font-size: 1.2rem; line-height: 1.6; }
+.pixel-dialog input {
+  width: 100%; margin-bottom: 20px; font: inherit; padding: 8px 10px; border: none; border-radius: 0;
+  background: var(--field); color: var(--text); box-shadow: inset 4px 4px 0 var(--ink);
+}
 .paste-panel { background: #29366f; padding: 12px; margin-bottom: 16px; box-shadow: var(--px); }
 .paste-panel textarea { margin-bottom: 8px; }
 .paste-result { margin: 8px 0 0; color: var(--muted); }
