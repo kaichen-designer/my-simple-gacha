@@ -195,6 +195,7 @@
     for (const s of parsed.students) addRow('roster-body', s.name, s.group === null ? '' : String(s.group));
     if (body.rows.length === 0) addRow('roster-body');
     const notes = [`已填入 ${parsed.students.length} 位，可以直接在表格裡修改`];
+    if (parsed.note) notes.push(parsed.note);
     if (parsed.duplicates.length) notes.push('重複的名字只填一次：' + parsed.duplicates.join('、'));
     if (parsed.invalidLines.length) notes.push('這幾行找不到姓名，已略過：' + parsed.invalidLines.join('、'));
     $('paste-result').textContent = notes.join('；');

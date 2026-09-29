@@ -44,7 +44,94 @@
     return { name, group };
   }
 
+  // ---- Pasted from Excel: cells separated by tabs ----
+  const HEADER_NAME = /^(姓名|名字|名稱|學生|name)$/i;
+  const HEADER_GROUP = /^(組別|組|group)$/i;
+  const HEADER_OTHER = /^(學號|座號|編號|號碼|號|序號|no\.?|id)$/i;
+  const GROUP_CELL_RE = new RegExp('^(?:第\\s*(' + NUM + ')\\s*[組组]|(' + NUM + ')\\s*[組组]|(\\d{1,2}))$');
+  const DIGITS_RE = /^[A-Za-z]{0,2}[\d\s\-._]+$/;
+
+  function looksTabular(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    return lines.length > 0 && lines.filter(l => l.includes('\t')).length * 2 >= lines.length;
+  }
+
+  // Group number from a cell such as 3, 第3組 or 三組; null when the cell is anything else.
+  function cellGroup(cell) {
+    const m = toHalfWidthDigits(cell).trim().match(GROUP_CELL_RE);
+    if (!m) return null;
+    const n = cnToInt(m[1] || m[2] || m[3]);
+    return Number.isInteger(n) && n >= 1 ? n : null;
+  }
+
+  function isHeaderRow(cells) {
+    const filled = cells.filter(c => c);
+    return filled.length > 0
+      && filled.some(c => HEADER_NAME.test(c) || HEADER_GROUP.test(c))
+      && filled.every(c => HEADER_NAME.test(c) || HEADER_GROUP.test(c) || HEADER_OTHER.test(c));
+  }
+
+  // Decides which column holds names and which holds groups (-1 when there is none).
+  function detectColumns(rows, header) {
+    const width = Math.max(...rows.map(r => r.length));
+    let name = header ? header.findIndex(c => HEADER_NAME.test(c)) : -1;
+    let group = header ? header.findIndex(c => HEADER_GROUP.test(c)) : -1;
+    const kinds = [];
+    for (let c = 0; c < width; c++) {
+      const cells = rows.map(r => r[c] || '').filter(x => x);
+      const isGroup = cells.length > 0 && cells.every(x => cellGroup(x) !== null);
+      const isDigits = cells.length > 0 && cells.every(x => DIGITS_RE.test(x));
+      kinds.push({ cells, kind: isGroup ? 'group' : isDigits ? 'digits' : 'text' });
+    }
+    if (name === -1) {
+      let best = -1;
+      kinds.forEach((k, c) => {
+        if (k.kind === 'text' && c !== group && (best === -1 || k.cells.length > kinds[best].cells.length)) best = c;
+      });
+      name = best;
+    }
+    if (group === -1) {
+      const candidates = kinds.map((k, c) => c).filter(c => kinds[c].kind === 'group' && c !== name);
+      // A group number repeats across a group's members; seat and id numbers do not.
+      group = candidates.reduce((best, c) => {
+        const distinct = new Set(kinds[c].cells.map(cellGroup)).size;
+        return best === -1 || distinct <= new Set(kinds[best].cells.map(cellGroup)).size ? c : best;
+      }, -1);
+    }
+    const ignored = [];
+    for (let c = 0; c < width; c++) if (c !== name && c !== group && kinds[c].cells.length) ignored.push(c);
+    return { name, group, ignored, header: header !== null };
+  }
+
+  function describeColumns(cols) {
+    const parts = ['姓名＝第' + (cols.name + 1) + '欄'];
+    parts.push(cols.group === -1 ? '沒有找到組別欄' : '組別＝第' + (cols.group + 1) + '欄');
+    if (cols.ignored.length) parts.push('已忽略第' + cols.ignored.map(c => c + 1).join('、') + '欄');
+    return '偵測到 Excel 表格：' + parts.join('、');
+  }
+
+  function parseTable(text) {
+    let rows = text.split(/\r?\n/).filter(l => l.trim()).map(l => l.split('\t').map(c => c.trim()));
+    const header = isHeaderRow(rows[0]) ? rows[0] : null;
+    if (header) rows = rows.slice(1);
+    const columns = rows.length ? detectColumns(rows, header) : { name: -1, group: -1, ignored: [], header: header !== null };
+    const students = [];
+    const duplicates = [];
+    const invalidLines = [];
+    const seen = new Set();
+    for (const cells of rows) {
+      const name = columns.name === -1 ? '' : (cells[columns.name] || '').replace(/\s+/g, ' ');
+      if (!name) { invalidLines.push(cells.join(' ').trim()); continue; }
+      if (seen.has(name)) { duplicates.push(name); continue; }
+      seen.add(name);
+      students.push({ name, group: columns.group === -1 ? null : cellGroup(cells[columns.group] || '') });
+    }
+    const note = columns.name === -1 ? '' : describeColumns(columns);
+    return { students, duplicates, invalidLines, columns, note };
+  }
+
   function parseRoster(text) {
+    if (looksTabular(String(text))) return parseTable(String(text));
     const students = [];
     const duplicates = [];
     const invalidLines = [];
