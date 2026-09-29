@@ -116,7 +116,7 @@ test('table paste: a header row is skipped and used for the columns', () => {
   const r = parseRoster(xl(['姓名', '組別'], ['王小明', '1'], ['李大華', '2']));
   assert.deepEqual(r.students, [{ name: '王小明', group: 1 }, { name: '李大華', group: 2 }]);
   assert.deepEqual(r.invalidLines, []);
-  assert.deepEqual(r.columns, { name: 0, group: 1, ignored: [], header: true });
+  assert.deepEqual(r.columns, { name: 0, group: 1, ignored: [], header: true, filledDown: false });
 });
 
 test('table paste: header decides which numeric column is the group', () => {
@@ -125,7 +125,7 @@ test('table paste: header decides which numeric column is the group', () => {
   assert.deepEqual(r.students, [
     { name: '王小明', group: 2 }, { name: '李大華', group: 1 }, { name: '陳美美', group: 2 },
   ]);
-  assert.deepEqual(r.columns, { name: 1, group: 2, ignored: [0], header: true });
+  assert.deepEqual(r.columns, { name: 1, group: 2, ignored: [0], header: true, filledDown: false });
 });
 
 test('table paste: without a header the repeating numeric column is the group', () => {
@@ -134,7 +134,7 @@ test('table paste: without a header the repeating numeric column is the group', 
     { name: '王小明', group: 1 }, { name: '李大華', group: 1 },
     { name: '陳美美', group: 2 }, { name: '林小華', group: 2 },
   ]);
-  assert.deepEqual(r.columns, { name: 1, group: 2, ignored: [0], header: false });
+  assert.deepEqual(r.columns, { name: 1, group: 2, ignored: [0], header: false, filledDown: false });
 });
 
 test('table paste: long student ids are ignored, not taken as the name', () => {
@@ -171,4 +171,45 @@ test('LINE-style text without tabs still uses the line parser and adds no table 
   const r = parseRoster('第1組 王小明\n李大華 1組');
   assert.equal('columns' in r, false);
   assert.equal('note' in r, false);
+});
+
+// Merged cells: the group label sits on the first row of each group only, with blank rows between groups.
+const MERGED = [
+  ['組別1', 'M11510105', '黃友琪'],
+  ['', 'M11410208', '鍾德蓉'],
+  ['', 'D11410004', '稅彩艷'],
+  ['', '', ''],
+  ['組別2', 'M11510108', '張哲誠'],
+  ['', 'M11510301', '丁逸'],
+  ['組別3', 'M11410308', '方藝璇'],
+  ['', 'M11510211', '張以平'],
+];
+
+test('table paste: 組別1 style labels count as groups', () => {
+  const r = parseRoster(xl(['黃友琪', '組別1'], ['李大華', '組別 2']));
+  assert.deepEqual(r.students.map(s => s.group), [1, 2]);
+});
+
+test('table paste: a group label on the first row of each block carries down to the blank cells below', () => {
+  const r = parseRoster(xl(...MERGED));
+  assert.deepEqual(r.students, [
+    { name: '黃友琪', group: 1 }, { name: '鍾德蓉', group: 1 }, { name: '稅彩艷', group: 1 },
+    { name: '張哲誠', group: 2 }, { name: '丁逸', group: 2 },
+    { name: '方藝璇', group: 3 }, { name: '張以平', group: 3 },
+  ]);
+  assert.deepEqual(r.invalidLines, []);
+  assert.deepEqual(r.columns, { name: 2, group: 0, ignored: [1], header: false, filledDown: true });
+  assert.match(r.note, /延續/);
+});
+
+test('table paste: carry-down also works under a header row', () => {
+  const r = parseRoster(xl(['組別', '學號', '姓名'], ...MERGED));
+  assert.equal(r.students.length, 7);
+  assert.deepEqual(r.students.map(s => s.group), [1, 1, 1, 2, 2, 3, 3]);
+});
+
+test('table paste: a few missing groups in an otherwise filled column are not carried down', () => {
+  const r = parseRoster(xl(['王小明', '1'], ['李大華', ''], ['陳美美', '2'], ['林小華', '2']));
+  assert.deepEqual(r.students.map(s => s.group), [1, null, 2, 2]);
+  assert.equal(r.columns.filledDown, false);
 });

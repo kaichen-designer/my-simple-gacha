@@ -48,7 +48,8 @@
   const HEADER_NAME = /^(姓名|名字|名稱|學生|name)$/i;
   const HEADER_GROUP = /^(組別|組|group)$/i;
   const HEADER_OTHER = /^(學號|座號|編號|號碼|號|序號|no\.?|id)$/i;
-  const GROUP_CELL_RE = new RegExp('^(?:第\\s*(' + NUM + ')\\s*[組组]|(' + NUM + ')\\s*[組组]|(\\d{1,2}))$');
+  const GROUP_CELL_RE = new RegExp(
+    '^(?:第\\s*(' + NUM + ')\\s*[組组]|(' + NUM + ')\\s*[組组]|(?:組別|组别|組|组|group)\\s*(' + NUM + ')|(\\d{1,2}))$', 'i');
   const DIGITS_RE = /^[A-Za-z]{0,2}[\d\s\-._]+$/;
 
   function looksTabular(text) {
@@ -56,11 +57,11 @@
     return lines.length > 0 && lines.filter(l => l.includes('\t')).length * 2 >= lines.length;
   }
 
-  // Group number from a cell such as 3, 第3組 or 三組; null when the cell is anything else.
+  // Group number from a cell such as 3, 第3組, 三組 or 組別3; null when the cell is anything else.
   function cellGroup(cell) {
     const m = toHalfWidthDigits(cell).trim().match(GROUP_CELL_RE);
     if (!m) return null;
-    const n = cnToInt(m[1] || m[2] || m[3]);
+    const n = cnToInt(m[1] || m[2] || m[3] || m[4]);
     return Number.isInteger(n) && n >= 1 ? n : null;
   }
 
@@ -100,21 +101,35 @@
     }
     const ignored = [];
     for (let c = 0; c < width; c++) if (c !== name && c !== group && kinds[c].cells.length) ignored.push(c);
-    return { name, group, ignored, header: header !== null };
+    return { name, group, ignored, header: header !== null, filledDown: false };
   }
 
   function describeColumns(cols) {
     const parts = ['姓名＝第' + (cols.name + 1) + '欄'];
     parts.push(cols.group === -1 ? '沒有找到組別欄' : '組別＝第' + (cols.group + 1) + '欄');
     if (cols.ignored.length) parts.push('已忽略第' + cols.ignored.map(c => c + 1).join('、') + '欄');
+    if (cols.filledDown) parts.push('空白的組別依上一列延續');
     return '偵測到 Excel 表格：' + parts.join('、');
+  }
+
+  // Merged cells paste as a group label on the first row of each block and blanks below it.
+  // Recognised when the first row has a label, no label repeats, and blanks outnumber labels.
+  function isMergedGroupColumn(rows, col) {
+    if (col === -1 || !rows[0][col]) return false;
+    const labels = rows.map(r => r[col] || '').filter(x => x).map(cellGroup);
+    const blanks = rows.length - labels.length;
+    return labels.every(n => n !== null) && new Set(labels).size === labels.length && blanks >= labels.length;
   }
 
   function parseTable(text) {
     let rows = text.split(/\r?\n/).filter(l => l.trim()).map(l => l.split('\t').map(c => c.trim()));
     const header = isHeaderRow(rows[0]) ? rows[0] : null;
     if (header) rows = rows.slice(1);
-    const columns = rows.length ? detectColumns(rows, header) : { name: -1, group: -1, ignored: [], header: header !== null };
+    const columns = rows.length
+      ? detectColumns(rows, header)
+      : { name: -1, group: -1, ignored: [], header: header !== null, filledDown: false };
+    columns.filledDown = rows.length > 0 && isMergedGroupColumn(rows, columns.group);
+    let carried = null;
     const students = [];
     const duplicates = [];
     const invalidLines = [];
@@ -124,7 +139,9 @@
       if (!name) { invalidLines.push(cells.join(' ').trim()); continue; }
       if (seen.has(name)) { duplicates.push(name); continue; }
       seen.add(name);
-      students.push({ name, group: columns.group === -1 ? null : cellGroup(cells[columns.group] || '') });
+      const cell = columns.group === -1 ? '' : cells[columns.group] || '';
+      if (columns.filledDown && cell) carried = cellGroup(cell);
+      students.push({ name, group: columns.filledDown ? carried : cellGroup(cell) });
     }
     const note = columns.name === -1 ? '' : describeColumns(columns);
     return { students, duplicates, invalidLines, columns, note };
