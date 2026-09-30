@@ -274,3 +274,20 @@ table.summary th, table.summary td { border: 1px solid var(--border); padding: 1
 .draw-main { position: relative; }
 .mute { position: absolute; top: 0; right: 0; font-size: 1rem; padding: 6px 12px; }
 @media (prefers-reduced-motion: reduce) { .reveal-card.blink { animation: none; } }
+
+/* Task order on the draw screen: upcoming tasks can be dragged or nudged with the arrows. */
+.order-hint { margin: 0 0 8px; color: var(--muted); font-size: 0.9rem; }
+.order { list-style: none; padding: 0; margin: 0 0 16px; }
+.order li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 8px; background: var(--field); box-shadow: var(--px); }
+.order .grip { width: 1.2em; text-align: center; color: var(--muted); }
+.order li.movable { cursor: grab; }
+.order li.movable .grip { color: var(--gold); }
+.order li.dragging { opacity: 0.4; }
+.order li.drop-target { box-shadow: var(--px), inset 0 4px 0 var(--accent); }
+.order li.current { background: #29366f; }
+.order li.done .o-name { color: var(--muted); }
+.order .o-text { flex: 1; min-width: 0; }
+.order .o-name { display: block; overflow-wrap: anywhere; }
+.order .o-meta { display: block; color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
+.order .o-move { display: flex; gap: 4px; }
+.order .o-move button { font-size: 0.8rem; padding: 2px 6px; }

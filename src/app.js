@@ -274,7 +274,89 @@
     return winners.map(w => `${w.label}：${w.detail}`).join('\n');
   }
 
+  // The task list beside the machine. Upcoming tasks can be dragged, or moved with ▲▼; the rest are locked.
+  function renderOrder() {
+    const s = state.session;
+    const first = D.firstMovable(s);
+    const last = s.tasks.length - 1;
+    $('order').replaceChildren(...s.tasks.map((task, i) => {
+      const movable = i >= first;
+      const li = el('li', undefined, [movable && 'movable', i === s.index && 'current', i < s.index && 'done'].filter(Boolean).join(' '));
+      li.dataset.index = String(i);
+      li.draggable = movable;
+      const text = el('span', undefined, 'o-text');
+      const winners = s.results[i].winners;
+      text.append(el('span', task.name, 'o-name'), el('span', movable ? `抽 ${task.count} ${unit()}` : winnersText(winners), 'o-meta'));
+      li.append(el('span', movable ? '⠿' : i === s.index ? '▶' : '✔', 'grip'), text);
+      if (movable) {
+        const moves = el('span', undefined, 'o-move');
+        for (const [dir, label, disabled] of [['up', '▲', i === first], ['down', '▼', i === last]]) {
+          const b = el('button', label);
+          b.type = 'button';
+          b.dataset.dir = dir;
+          b.disabled = disabled;
+          b.setAttribute('aria-label', `${dir === 'up' ? '上移' : '下移'}「${task.name}」`);
+          moves.append(b);
+        }
+        li.append(moves);
+      }
+      return li;
+    }));
+  }
+
+  // Moves an upcoming task, keeps the table on the setup screen in the same order, and redraws.
+  function reorderTask(from, to, focusDir) {
+    if (state.busy) return;
+    const next = D.moveTask(state.session, from, to);
+    if (next === state.session) return;
+    commit(next);
+    setRows('tasks-body', next.tasks.map(t => ({ name: t.name, count: String(t.count) })));
+    refreshSetup();
+    renderDraw();
+    if (!focusDir) return;
+    const row = $('order').querySelector(`li[data-index="${to}"]`);
+    (row.querySelector(`button[data-dir="${focusDir}"]:not(:disabled)`) || row.querySelector('button:not(:disabled)'))?.focus();
+  }
+
+  function onOrderClick(e) {
+    const button = e.target.closest('.o-move button');
+    if (!button) return;
+    const i = Number(button.closest('li').dataset.index);
+    reorderTask(i, button.dataset.dir === 'up' ? i - 1 : i + 1, button.dataset.dir);
+  }
+
+  let dragFrom = null;
+  function endDrag() {
+    dragFrom = null;
+    for (const li of $('order').children) li.classList.remove('dragging', 'drop-target');
+  }
+
+  function onOrderDragStart(e) {
+    const li = e.target.closest('li.movable');
+    if (!li || state.busy) { e.preventDefault(); return; }
+    dragFrom = Number(li.dataset.index);
+    li.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(dragFrom));
+  }
+
+  function onOrderDragOver(e) {
+    const li = e.target.closest('li.movable');
+    if (dragFrom === null || !li) return;
+    e.preventDefault();
+    for (const other of $('order').children) other.classList.toggle('drop-target', other === li && other.dataset.index !== String(dragFrom));
+  }
+
+  function onOrderDrop(e) {
+    e.preventDefault();
+    const li = e.target.closest('li.movable');
+    const from = dragFrom;
+    endDrag();
+    if (li && from !== null) reorderTask(from, Number(li.dataset.index));
+  }
+
   function renderSide() {
+    renderOrder();
     const s = state.session;
     const drawn = s.results.filter(r => r.winners.length);
     $('results').replaceChildren(...drawn.map(r => el('li', `${r.task.name}：${winnersText(r.winners)}`)));
@@ -353,14 +435,21 @@
     renderDraw();
   }
 
+  // Every change to the draw is kept, so a reload picks up exactly where it was.
+  function commit(session) {
+    state.session = session;
+    if (session) state.store.saveSession({ mode: state.sessionMode, session });
+    else state.store.clearSession();
+  }
+
   function startSession() {
-    state.session = D.createSession(state.tasks, state.pool);
     state.sessionMode = state.mode;
+    commit(D.createSession(state.tasks, state.pool));
     showSession();
   }
 
   function resumeSession() {
-    state.session = D.reconcileSession(state.session, state.tasks, state.pool);
+    commit(D.reconcileSession(state.session, state.tasks, state.pool));
     showSession();
   }
 
@@ -416,7 +505,7 @@
     }
     $('paste-text').value = '';
     $('paste-result').textContent = '';
-    state.session = null;
+    commit(null);
     refreshSetup();
   }
 
@@ -431,7 +520,7 @@
     state.busy = true;
     $('draw').disabled = true;
     $('next').disabled = true;
-    state.session = D.drawOne(state.session);
+    commit(D.drawOne(state.session));
     const winners = D.currentResult(state.session).winners;
     await state.machine.dispense(winners[winners.length - 1], { task: D.currentTask(state.session).name });
     state.busy = false;
@@ -449,7 +538,7 @@
   // Moving on to the next task draws its first ball straight away, unless the pool is already empty.
   function onNext() {
     if (state.busy) return;
-    state.session = D.nextTask(state.session);
+    commit(D.nextTask(state.session));
     if (D.isFinished(state.session)) {
       renderSummary();
       showScreen('summary');
@@ -486,6 +575,11 @@
   $('resume').addEventListener('click', resumeSession);
   $('restart').addEventListener('click', restartSession);
   $('clear-all').addEventListener('click', clearAll);
+  $('order').addEventListener('click', onOrderClick);
+  $('order').addEventListener('dragstart', onOrderDragStart);
+  $('order').addEventListener('dragover', onOrderDragOver);
+  $('order').addEventListener('drop', onOrderDrop);
+  $('order').addEventListener('dragend', endDrag);
   // Esc on the draw or summary screen goes back to setup (once any animation has finished).
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape' || $('confirm').open) return;
@@ -516,5 +610,13 @@
   state.machine = D.createMachine($('gacha'), { sfx: state.sfx });
   state.machine.setActor(D.createTeacher($('gacha'), { sfx: state.sfx }));
   renderMute();
+  // A draw that was under way before a reload comes back on the screen it was on.
+  const saved = state.store.loadSession();
+  if (saved) {
+    state.session = saved.session;
+    state.sessionMode = saved.mode;
+    document.querySelector(`input[name="mode"][value="${saved.mode}"]`).checked = true;
+  }
   refreshSetup();
+  if (state.session) showSession();
 })();

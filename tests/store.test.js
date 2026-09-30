@@ -108,3 +108,76 @@ test('unavailable storage never throws and reports failure', () => {
   assert.doesNotThrow(() => store.removeSave('roster', 'A'));
   assert.equal(createStore(null).saveDraft({ roster, tasks }), false);
 });
+
+// ---- a draw in progress survives a reload ----
+const pool = [
+  { id: 'g1', label: '第1組', detail: '王小明', group: 1 },
+  { id: 'g2', label: '第2組', detail: '李大華', group: 2 },
+  { id: 'g3', label: '第3組', detail: '陳美美', group: 3 },
+];
+function inProgress() {
+  return {
+    mode: 'group',
+    session: {
+      tasks: [{ name: '掃地', count: 2 }, { name: '倒垃圾', count: 1 }],
+      remaining: [pool[2]],
+      results: [
+        { task: { name: '掃地', count: 2 }, winners: [pool[0], pool[1]], shortfall: 0 },
+        { task: { name: '倒垃圾', count: 1 }, winners: [], shortfall: 0 },
+      ],
+      index: 1,
+    },
+  };
+}
+
+test('session round-trips and is independent of draft and named saves', () => {
+  const store = createStore(memoryStorage());
+  assert.equal(store.loadSession(), null);
+  assert.equal(store.saveSession(inProgress()), true);
+  store.saveDraft({ roster, tasks });
+  store.putSave('roster', 'A', roster);
+  assert.deepEqual(store.loadSession(), inProgress());
+  assert.deepEqual(store.loadDraft(), { roster, tasks });
+  store.saveDraft({ roster: [], tasks: [] });
+  assert.deepEqual(store.loadSession(), inProgress());
+});
+
+test('clearSession removes only the session', () => {
+  const store = createStore(memoryStorage());
+  store.saveSession(inProgress());
+  store.saveDraft({ roster, tasks });
+  store.clearSession();
+  assert.equal(store.loadSession(), null);
+  assert.deepEqual(store.loadDraft(), { roster, tasks });
+});
+
+test('a finished session (index past the last task) is kept', () => {
+  const store = createStore(memoryStorage());
+  const done = inProgress();
+  done.session.index = 2;
+  store.saveSession(done);
+  assert.equal(store.loadSession().session.index, 2);
+});
+
+test('malformed sessions are dropped', () => {
+  const broken = [
+    { mode: 'other' },
+    { ...inProgress(), mode: 'sideways' },
+    (() => { const x = inProgress(); x.session.index = 9; return x; })(),
+    (() => { const x = inProgress(); x.session.results.pop(); return x; })(),
+    (() => { const x = inProgress(); x.session.tasks[0].count = 0; return x; })(),
+    (() => { const x = inProgress(); x.session.remaining = [{ id: 5 }]; return x; })(),
+    (() => { const x = inProgress(); x.session.results[0].winners = 'oops'; return x; })(),
+  ];
+  for (const b of broken) {
+    const store = createStore(memoryStorage(JSON.stringify({ session: b })));
+    assert.equal(store.loadSession(), null, JSON.stringify(b).slice(0, 60));
+  }
+});
+
+test('session storage failures never throw', () => {
+  const store = createStore(brokenStorage);
+  assert.equal(store.saveSession(inProgress()), false);
+  assert.equal(store.loadSession(), null);
+  assert.doesNotThrow(() => store.clearSession());
+});

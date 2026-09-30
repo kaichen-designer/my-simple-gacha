@@ -90,6 +90,25 @@
     return { ...withCurrentResult(s, { ...r, shortfall: needed(s) }), index: s.index + 1 };
   }
 
+  // Index of the first task whose place can still change: tasks already drawn, or under way, are locked.
+  function firstMovable(s) {
+    const r = currentResult(s);
+    return r && r.winners.length === 0 ? s.index : s.index + 1;
+  }
+
+  // Moves an upcoming task to a new place in the order; anything else returns the session unchanged.
+  function moveTask(s, from, to) {
+    const first = firstMovable(s);
+    const last = s.tasks.length - 1;
+    if (from === to || from < first || to < first || from > last || to > last) return s;
+    const reorder = list => {
+      const copy = list.slice();
+      copy.splice(to, 0, copy.splice(from, 1)[0]);
+      return copy;
+    };
+    return { ...s, tasks: reorder(s.tasks), results: reorder(s.results) };
+  }
+
   // Applies edited tasks and pool to a session in progress: assignments carry over by task name
   // (in order, up to the new count) as long as the winner is still in the pool; everyone else
   // is back in the pool; drawing resumes at the first task that still needs someone.
@@ -120,7 +139,7 @@
   }
 
   const api = {
-    reconcileSession,
+    reconcileSession, firstMovable, moveTask,
     pickRandom, buildPool, validateSetup, createSession, currentTask, currentResult,
     isFinished, needed, isCurrentComplete, drawOne, nextTask,
   };

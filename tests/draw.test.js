@@ -166,3 +166,68 @@ test('reconcileSession keeps only as many winners as the lowered count and frees
   assert.deepEqual(s.remaining.map(p => p.label), ['第2組', '第3組']);
   assert.equal(D.isFinished(s), true);
 });
+
+// ---- reordering tasks during a draw ----
+function sessionOf(names, pool) {
+  return D.createSession(names.map(name => ({ name, count: 1 })), pool);
+}
+const poolOf = n => Array.from({ length: n }, (_, i) => ({ id: 'g' + (i + 1), label: '第' + (i + 1) + '組', detail: '', group: i + 1 }));
+const order = s => s.tasks.map(t => t.name).join('');
+
+test('firstMovable is the current task until it has a winner, then the one after', () => {
+  let s = sessionOf(['A', 'B', 'C'], poolOf(5));
+  assert.equal(D.firstMovable(s), 0);
+  s = D.drawOne(s, zero);
+  assert.equal(D.firstMovable(s), 1);
+  s = D.nextTask(s);
+  assert.equal(D.firstMovable(s), 1); // B has no winner yet
+  s = D.drawOne(s, zero);
+  assert.equal(D.firstMovable(s), 2);
+});
+
+test('moveTask reorders upcoming tasks together with their results', () => {
+  let s = D.drawOne(sessionOf(['A', 'B', 'C', 'D'], poolOf(6)), zero);
+  const moved = D.moveTask(s, 3, 1);
+  assert.equal(order(moved), 'ADBC');
+  assert.deepEqual(moved.results.map(r => r.task.name), ['A', 'D', 'B', 'C']);
+  assert.equal(moved.index, 0);
+  assert.equal(moved.results[0].winners.length, 1);
+  assert.deepEqual(moved.remaining, s.remaining);
+  assert.equal(order(D.moveTask(s, 1, 3)), 'ACDB');
+});
+
+test('moveTask does not touch the original session', () => {
+  const s = D.drawOne(sessionOf(['A', 'B', 'C'], poolOf(4)), zero);
+  D.moveTask(s, 2, 1);
+  assert.equal(order(s), 'ABC');
+});
+
+test('moveTask refuses to move or pass tasks that are drawn or under way', () => {
+  let s = D.nextTask(D.drawOne(sessionOf(['A', 'B', 'C', 'D'], poolOf(6)), zero)); // B is current, no winner yet
+  assert.equal(order(D.moveTask(s, 0, 2)), 'ABCD'); // A is drawn
+  assert.equal(order(D.moveTask(s, 2, 0)), 'ABCD'); // cannot land in front of drawn A
+  assert.equal(order(D.moveTask(s, 3, 1)), 'ADBC');  // B has no winner: it may still be pushed back
+  s = D.drawOne(s, zero); // B now has a winner
+  assert.equal(order(D.moveTask(s, 1, 3)), 'ABCD');
+  assert.equal(order(D.moveTask(s, 3, 1)), 'ABCD');
+  assert.equal(order(D.moveTask(s, 3, 2)), 'ABDC');
+});
+
+test('moveTask ignores out-of-range or no-op moves and finished sessions', () => {
+  const s = sessionOf(['A', 'B', 'C'], poolOf(3));
+  assert.equal(D.moveTask(s, 0, 0), s);
+  assert.equal(D.moveTask(s, 0, 5), s);
+  assert.equal(D.moveTask(s, -1, 1), s);
+  let done = s;
+  while (!D.isFinished(done)) done = D.nextTask(D.drawOne(done, zero));
+  assert.equal(D.moveTask(done, 0, 1), done);
+});
+
+test('after moving the current, untouched task the session keeps drawing the new first task', () => {
+  const s = sessionOf(['A', 'B', 'C'], poolOf(3));
+  const moved = D.moveTask(s, 2, 0);
+  assert.equal(D.currentTask(moved).name, 'C');
+  const drawn = D.drawOne(moved, zero);
+  assert.equal(D.currentResult(drawn).task.name, 'C');
+  assert.equal(D.currentResult(drawn).winners.length, 1);
+});
