@@ -446,6 +446,7 @@
     $('mute').setAttribute('aria-pressed', String(muted));
   }
 
+  // Moving on to the next task draws its first ball straight away, unless the pool is already empty.
   function onNext() {
     if (state.busy) return;
     state.session = D.nextTask(state.session);
@@ -455,6 +456,7 @@
     } else {
       state.machine.showHint();
       renderDraw();
+      if (!D.isCurrentComplete(state.session)) onDraw();
     }
   }
 
